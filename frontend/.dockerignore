@@ -1,4 +1,13 @@
+# frontend/.dockerignore
+
+# Dependencias y builds
 node_modules
 npm-debug.log
 dist
+
+# No queremos el .env “local” de desarrollo dentro de la imagen
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
