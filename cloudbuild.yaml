@@ -75,15 +75,10 @@ steps:
       - "1"
 
 substitutions:
-  # URL pública del backend (Cloud Run) vista por el frontend.
-  # La primera vez puedes usar un placeholder y luego actualizarla
-  # con la URL real de email-studio-backend.
-  _FRONT_VITE_API_BASE: "https://EMAIL-STUDIO-BACKEND-URL.a.run.app"
-
-  # Coherentes con backend/.env.example y frontend/.env.example
-  _FRONT_VITE_GCS_BUCKET: "tu-bucket-imagenes"
+  _FRONT_VITE_API_BASE: "https://backend-151554496273.europe-west1.run.app"
+  _FRONT_VITE_GCS_BUCKET: "poc-ai-martech-sandbox"
   _FRONT_VITE_GCS_PREFIX: "dev"
-  _FRONT_VITE_SFMC_CATEGORY_ID: "000000"
+  _FRONT_VITE_SFMC_CATEGORY_ID: "239156"
 
 images:
   - "gcr.io/$PROJECT_ID/email-studio-backend:$SHORT_SHA"
