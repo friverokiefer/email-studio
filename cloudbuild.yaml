@@ -22,7 +22,7 @@ steps:
       - --platform
       - managed
       - --region
-      - us-central1
+      - europe-west1
       - --allow-unauthenticated
       - --port
       - "8080"
@@ -30,9 +30,9 @@ steps:
       - 512Mi
       - --cpu
       - "1"
-      # Ejemplo de secrets (ajusta nombres reales en Secret Manager):
-      # - --set-secrets
-      # - OPENAI_API_KEY=OPENAI_API_KEY:latest,SFMC_CLIENT_ID=SFMC_CLIENT_ID:latest,SFMC_CLIENT_SECRET=SFMC_CLIENT_SECRET:latest
+      # Si quieres luego puedes añadir:
+      # - --set-env-vars
+      # - GCP_BUCKET_NAME=poc-ai-martech-sandbox,GCP_PREFIX=dev
 
   # ===== FRONTEND (Docker + NGINX) =====
   - name: 'gcr.io/cloud-builders/docker'
@@ -65,7 +65,7 @@ steps:
       - --platform
       - managed
       - --region
-      - us-central1
+      - europe-west1
       - --allow-unauthenticated
       - --port
       - "8080"
@@ -75,7 +75,9 @@ steps:
       - "1"
 
 substitutions:
+  # URL pública del backend vista por el frontend
   _FRONT_VITE_API_BASE: "https://backend-151554496273.europe-west1.run.app"
+  # Bucket y prefix que ya comprobaste que funcionan en local
   _FRONT_VITE_GCS_BUCKET: "poc-ai-martech-sandbox"
   _FRONT_VITE_GCS_PREFIX: "dev"
   _FRONT_VITE_SFMC_CATEGORY_ID: "239156"
