@@ -9,6 +9,7 @@ export const emailV2MetaRouter = Router();
 
 /**
  * GET /api/email-v2/meta
+ * (y alias GET /api/email-v2)
  *
  * Endpoint de meta para Email 2.0 consumido por el frontend.
  *
@@ -23,7 +24,7 @@ export const emailV2MetaRouter = Router();
  * Query opcional:
  *   ?refresh=1  → fuerza recarga (ignora caché de Node)
  */
-emailV2MetaRouter.get("/meta", async (req, res, next) => {
+emailV2MetaRouter.get(["/meta", "/"], async (req, res, next) => {
   try {
     const refreshParam = String(req.query.refresh || "").toLowerCase();
     const forceRefresh =

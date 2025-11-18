@@ -1,5 +1,6 @@
 // backend/src/services/gcpStorage.ts
-import "dotenv/config"; // En local lee .env; en Cloud Run no hace daño
+
+import "dotenv/config"; // En local lee .env; en Cloud Run es inocuo
 import fs from "fs";
 import path from "path";
 import { Storage, GetSignedUrlConfig } from "@google-cloud/storage";
@@ -24,28 +25,59 @@ function resolveKeyPath(p?: string | null): string | undefined {
   return p;
 }
 
-const keyPath = resolveKeyPath(GOOGLE_APPLICATION_CREDENTIALS);
-const hasKeyFile = keyPath && fs.existsSync(keyPath);
+/**
+ * Estrategia de credenciales:
+ * - Si hay GOOGLE_APPLICATION_CREDENTIALS y el archivo existe → usamos ese path.
+ * - Si no, probamos un default local: ./\.secrets/service-account.json
+ * - Si nada existe → limpiamos GOOGLE_APPLICATION_CREDENTIALS y usamos ADC.
+ */
+const candidatePaths: string[] = [];
 
-// Si hay ruta pero no archivo → advertimos y dejamos que use ADC.
-if (keyPath && !hasKeyFile) {
+// 1) Lo que venga por env (absoluto o relativo)
+const envResolved = resolveKeyPath(GOOGLE_APPLICATION_CREDENTIALS);
+if (envResolved) candidatePaths.push(envResolved);
+
+// 2) Default convencional para local/backend
+const defaultLocalKey = path.resolve(process.cwd(), ".secrets", "service-account.json");
+if (!candidatePaths.includes(defaultLocalKey)) {
+  candidatePaths.push(defaultLocalKey);
+}
+
+let effectiveKeyPath: string | undefined;
+for (const p of candidatePaths) {
+  try {
+    if (p && fs.existsSync(p)) {
+      effectiveKeyPath = p;
+      break;
+    }
+  } catch {
+    // ignoramos errores de fs
+  }
+}
+
+// Normalizamos env para la librería de Google
+if (effectiveKeyPath) {
+  // Sobrescribimos con el path correcto (absoluto)
+  process.env.GOOGLE_APPLICATION_CREDENTIALS = effectiveKeyPath;
+} else if (GOOGLE_APPLICATION_CREDENTIALS) {
+  // Había variable, pero ningún archivo existe → limpiamos para que GCP use ADC
   console.warn(
-    `⚠️ GOOGLE_APPLICATION_CREDENTIALS apunta a ${keyPath}, ` +
-      "pero el archivo no existe. Se usará Application Default Credentials (ADC)."
+    `⚠️ GOOGLE_APPLICATION_CREDENTIALS apunta a ${envResolved}, ` +
+      "pero no existe ningún archivo usable. Se usará Application Default Credentials (ADC)."
   );
+  delete (process.env as any).GOOGLE_APPLICATION_CREDENTIALS;
 }
 
 // Opciones para Storage:
-// - En Cloud Run: basta con projectId (o incluso vacío).
-// - En local: si definiste GOOGLE_APPLICATION_CREDENTIALS y existe, se usa ese json.
+// - En Cloud Run: normalmente basta con projectId (o ni eso) → ADC.
+// - En local/Docker: si encontramos JSON, usamos keyFilename.
 const storageOptions: any = {};
 if (GCP_PROJECT_ID) storageOptions.projectId = GCP_PROJECT_ID;
-if (hasKeyFile) storageOptions.keyFilename = keyPath;
+if (effectiveKeyPath) storageOptions.keyFilename = effectiveKeyPath;
 
 const storage = new Storage(storageOptions);
 
-// Si no hay bucket configurado, no reventamos aquí.
-// Las funciones usarán ensureBucket() y tirarán un error claro.
+// Si no hay bucket, no rompemos aquí. Lo validamos al usarlo.
 const bucket = GCP_BUCKET_NAME ? storage.bucket(GCP_BUCKET_NAME) : null;
 
 const isPublic = GCP_PUBLIC_READ === "true";
@@ -53,7 +85,7 @@ const urlStyle = ((GCP_URL_STYLE || "direct").toLowerCase() === "console"
   ? "console"
   : "direct") as "direct" | "console";
 
-/** Config visible para otras partes del backend */
+/** Exportamos la config usada por las rutas */
 export const CFG = {
   PROJECT_ID: GCP_PROJECT_ID || "",
   BUCKET: GCP_BUCKET_NAME || "",
@@ -65,7 +97,7 @@ export const CFG = {
 if (GCP_BUCKET_NAME) {
   console.log(
     `✅ GCP listo → bucket=${GCP_BUCKET_NAME} · prefix=${GCP_PREFIX} · publicRead=${isPublic} · urlStyle=${urlStyle} · auth=${
-      hasKeyFile ? "json-key" : "ADC"
+      effectiveKeyPath ? "json-key" : "ADC"
     }`
   );
 } else {
@@ -131,44 +163,27 @@ export function detectContentTypeByExt(filename: string): string {
   const ext = path.extname(filename).toLowerCase();
   switch (ext) {
     // imágenes
-    case ".png":
-      return "image/png";
+    case ".png": return "image/png";
     case ".jpg":
-    case ".jpeg":
-      return "image/jpeg";
-    case ".webp":
-      return "image/webp";
-    case ".gif":
-      return "image/gif";
-    case ".svg":
-      return "image/svg+xml";
-    case ".avif":
-      return "image/avif";
-    case ".ico":
-      return "image/x-icon";
+    case ".jpeg": return "image/jpeg";
+    case ".webp": return "image/webp";
+    case ".gif": return "image/gif";
+    case ".svg": return "image/svg+xml";
+    case ".avif": return "image/avif";
+    case ".ico": return "image/x-icon";
     // texto / datos
-    case ".json":
-      return "application/json";
-    case ".jsonl":
-      return "application/x-ndjson";
-    case ".html":
-      return "text/html; charset=utf-8";
-    case ".txt":
-      return "text/plain; charset=utf-8";
-    case ".csv":
-      return "text/csv; charset=utf-8";
-    case ".md":
-      return "text/markdown; charset=utf-8";
+    case ".json": return "application/json";
+    case ".jsonl": return "application/x-ndjson";
+    case ".html": return "text/html; charset=utf-8";
+    case ".txt": return "text/plain; charset=utf-8";
+    case ".csv": return "text/csv; charset=utf-8";
+    case ".md": return "text/markdown; charset=utf-8";
     case ".yaml":
-    case ".yml":
-      return "application/yaml";
+    case ".yml": return "application/yaml";
     // binarios comunes
-    case ".pdf":
-      return "application/pdf";
-    case ".zip":
-      return "application/zip";
-    case ".mp4":
-      return "video/mp4";
+    case ".pdf": return "application/pdf";
+    case ".zip": return "application/zip";
+    case ".mp4": return "video/mp4";
     default:
       return "application/octet-stream";
   }
@@ -182,7 +197,7 @@ function ensureBucket() {
   if (!bucket || !GCP_BUCKET_NAME) {
     throw new Error(
       "GCS no está configurado: falta GCP_BUCKET_NAME. " +
-        "Configúralo en las variables de entorno del servicio backend en Cloud Run."
+        "Configúralo en las variables de entorno del backend."
     );
   }
   return bucket;
@@ -275,7 +290,7 @@ export async function getSignedReadUrl(objectPath: string, minutes = 60) {
 /**
  * Devuelve una URL lista para usar en <img src> o fetch:
  * - Si el bucket es público → devuelve pública (direct o console según CFG.URL_STYLE)
- * - Si es privado → devuelve URL firmada v4 (dominio storage.googleapis.com)
+ * - Si es privado → devuelve URL firmada v4
  */
 export async function ensureReadUrl(objectPath: string, minutes = 60) {
   if (isPublic) {
