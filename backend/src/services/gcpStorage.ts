@@ -1,146 +1,102 @@
 // backend/src/services/gcpStorage.ts
 
-import "dotenv/config"; // En local lee .env; en Cloud Run es inocuo
+import "dotenv/config";
 import fs from "fs";
 import path from "path";
 import { Storage, GetSignedUrlConfig } from "@google-cloud/storage";
 
 /* =========================
- *  CONFIG BÁSICA DESDE ENV
+ * CONFIGURACIÓN Y AUTH
  * ========================= */
 const {
   GCP_PROJECT_ID,
   GCP_BUCKET_NAME,
-  GOOGLE_APPLICATION_CREDENTIALS,
   GCP_PREFIX = "dev",
   GCP_PUBLIC_READ = "false",
-  GCP_URL_STYLE = "direct", // 'direct' | 'console'
+  GCP_URL_STYLE = "direct",
 } = process.env;
 
-function resolveKeyPath(p?: string | null): string | undefined {
-  if (!p) return undefined;
-  if (p.startsWith("./") || p.startsWith("../")) {
-    return path.resolve(process.cwd(), p);
-  }
-  return p;
-}
+// Detección simple y robusta de credenciales
+const localKeyPath = path.resolve(process.cwd(), ".secrets", "service-account.json");
+const hasLocalKey = fs.existsSync(localKeyPath);
 
-/**
- * Estrategia de credenciales:
- * - Si hay GOOGLE_APPLICATION_CREDENTIALS y el archivo existe → usamos ese path.
- * - Si no, probamos un default local: ./\.secrets/service-account.json
- * - Si nada existe → limpiamos GOOGLE_APPLICATION_CREDENTIALS y usamos ADC.
- */
-const candidatePaths: string[] = [];
-
-// 1) Lo que venga por env (absoluto o relativo)
-const envResolved = resolveKeyPath(GOOGLE_APPLICATION_CREDENTIALS);
-if (envResolved) candidatePaths.push(envResolved);
-
-// 2) Default convencional para local/backend
-const defaultLocalKey = path.resolve(process.cwd(), ".secrets", "service-account.json");
-if (!candidatePaths.includes(defaultLocalKey)) {
-  candidatePaths.push(defaultLocalKey);
-}
-
-let effectiveKeyPath: string | undefined;
-for (const p of candidatePaths) {
-  try {
-    if (p && fs.existsSync(p)) {
-      effectiveKeyPath = p;
-      break;
-    }
-  } catch {
-    // ignoramos errores de fs
-  }
-}
-
-// Normalizamos env para la librería de Google
-if (effectiveKeyPath) {
-  // Sobrescribimos con el path correcto (absoluto)
-  process.env.GOOGLE_APPLICATION_CREDENTIALS = effectiveKeyPath;
-} else if (GOOGLE_APPLICATION_CREDENTIALS) {
-  // Había variable, pero ningún archivo existe → limpiamos para que GCP use ADC
-  console.warn(
-    `⚠️ GOOGLE_APPLICATION_CREDENTIALS apunta a ${envResolved}, ` +
-      "pero no existe ningún archivo usable. Se usará Application Default Credentials (ADC)."
-  );
-  delete (process.env as any).GOOGLE_APPLICATION_CREDENTIALS;
-}
-
-// Opciones para Storage:
-// - En Cloud Run: normalmente basta con projectId (o ni eso) → ADC.
-// - En local/Docker: si encontramos JSON, usamos keyFilename.
 const storageOptions: any = {};
-if (GCP_PROJECT_ID) storageOptions.projectId = GCP_PROJECT_ID;
-if (effectiveKeyPath) storageOptions.keyFilename = effectiveKeyPath;
+
+if (hasLocalKey) {
+  // Entorno LOCAL: usamos archivo
+  storageOptions.keyFilename = localKeyPath;
+  if (GCP_PROJECT_ID) storageOptions.projectId = GCP_PROJECT_ID;
+} else {
+  // Entorno CLOUD RUN: usamos credenciales automáticas (ADC)
+  if (GCP_PROJECT_ID) storageOptions.projectId = GCP_PROJECT_ID;
+}
 
 const storage = new Storage(storageOptions);
 
-// Si no hay bucket, no rompemos aquí. Lo validamos al usarlo.
-const bucket = GCP_BUCKET_NAME ? storage.bucket(GCP_BUCKET_NAME) : null;
+// Inicialización del bucket (lazy warning)
+if (GCP_BUCKET_NAME) {
+  // Instanciamos para uso interno
+  const _b = storage.bucket(GCP_BUCKET_NAME);
+} else {
+  console.warn(
+    "⚠️ GCP_BUCKET_NAME no definido. Funcionalidades de almacenamiento fallarán."
+  );
+}
 
 const isPublic = GCP_PUBLIC_READ === "true";
 const urlStyle = ((GCP_URL_STYLE || "direct").toLowerCase() === "console"
   ? "console"
   : "direct") as "direct" | "console";
 
-/** Exportamos la config usada por las rutas */
+/** Helper interno para asegurar que tenemos bucket */
+function ensureBucket() {
+  if (!GCP_BUCKET_NAME) {
+    throw new Error("Falta GCP_BUCKET_NAME en variables de entorno.");
+  }
+  return storage.bucket(GCP_BUCKET_NAME);
+}
+
+// EXPORT 1: Configuración pública (necesario para generated.ts)
 export const CFG = {
   PROJECT_ID: GCP_PROJECT_ID || "",
   BUCKET: GCP_BUCKET_NAME || "",
-  PREFIX: String(GCP_PREFIX),
+  PREFIX: String(GCP_PREFIX || "dev"),
   PUBLIC_READ: isPublic,
   URL_STYLE: urlStyle,
 };
 
-if (GCP_BUCKET_NAME) {
-  console.log(
-    `✅ GCP listo → bucket=${GCP_BUCKET_NAME} · prefix=${GCP_PREFIX} · publicRead=${isPublic} · urlStyle=${urlStyle} · auth=${
-      effectiveKeyPath ? "json-key" : "ADC"
-    }`
-  );
-} else {
-  console.warn(
-    "⚠️ GCP_BUCKET_NAME no está definido. Las funciones que usan GCS lanzarán error si se llaman."
-  );
-}
-
 /* =========================
- *  HELPERS DE RUTA Y URLs
+ * HELPERS DE RUTA Y URLS
  * ========================= */
 
 function normalizeKey(p: string) {
   return String(p).replace(/^\/+/, "").replace(/\\/g, "/");
 }
 
-/** Aplica el prefijo de entorno (dev/, prod/, etc.) */
 export function withPrefix(relativeKey: string): string {
   const normalized = normalizeKey(relativeKey);
   const prefix = `${String(GCP_PREFIX).replace(/^\/+|\/+$/g, "")}/`;
   return normalized.startsWith(prefix) ? normalized : `${prefix}${normalized}`;
 }
 
-/** URL pública directa (googleapis) */
 export function publicDirectUrl(objectPath: string): string {
   const key = normalizeKey(withPrefix(objectPath));
   const encoded = key.split("/").map(encodeURIComponent).join("/");
   return `https://storage.googleapis.com/${GCP_BUCKET_NAME}/${encoded}`;
 }
 
-/** URL del viewer (storage.cloud.google.com) — requiere sesión si el bucket no es público */
 export function publicConsoleUrl(objectPath: string): string {
   const key = normalizeKey(withPrefix(objectPath));
   const encoded = key.split("/").map(encodeURIComponent).join("/");
   return `https://storage.cloud.google.com/${GCP_BUCKET_NAME}/${encoded}`;
 }
 
-/** Alias útil para “URL pública” según estilo configurado */
 export function publicObjectUrl(objectPath: string): string {
-  return urlStyle === "console" ? publicConsoleUrl(objectPath) : publicDirectUrl(objectPath);
+  return urlStyle === "console"
+    ? publicConsoleUrl(objectPath)
+    : publicDirectUrl(objectPath);
 }
 
-/** URL de consola (Detalles del objeto en GCP Console) */
 export function cloudConsoleUrl(objectPath: string): string {
   const keyWithPrefix = withPrefix(objectPath).replace(/^\/+/, "");
   const encoded = keyWithPrefix.split("/").map(encodeURIComponent).join("/");
@@ -148,63 +104,37 @@ export function cloudConsoleUrl(objectPath: string): string {
   return `https://console.cloud.google.com/storage/browser/_details/${GCP_BUCKET_NAME}/${encoded}?project=${proj}`;
 }
 
-/** gs://bucket/key (info) */
 export function toGsUri(objectPath: string): string {
   return `gs://${GCP_BUCKET_NAME}/${normalizeKey(withPrefix(objectPath))}`;
 }
 
-/** Por compatibilidad con código existente */
+// EXPORT 2: Alias legacy (necesario para generateEmailV2.ts)
 export const cloudBrowserUrl = publicConsoleUrl;
 
 /* =========================
- *  MIME TYPES
+ * MIME TYPES
  * ========================= */
 export function detectContentTypeByExt(filename: string): string {
   const ext = path.extname(filename).toLowerCase();
   switch (ext) {
-    // imágenes
     case ".png": return "image/png";
     case ".jpg":
     case ".jpeg": return "image/jpeg";
     case ".webp": return "image/webp";
     case ".gif": return "image/gif";
     case ".svg": return "image/svg+xml";
-    case ".avif": return "image/avif";
-    case ".ico": return "image/x-icon";
-    // texto / datos
     case ".json": return "application/json";
-    case ".jsonl": return "application/x-ndjson";
     case ".html": return "text/html; charset=utf-8";
     case ".txt": return "text/plain; charset=utf-8";
     case ".csv": return "text/csv; charset=utf-8";
-    case ".md": return "text/markdown; charset=utf-8";
-    case ".yaml":
-    case ".yml": return "application/yaml";
-    // binarios comunes
     case ".pdf": return "application/pdf";
-    case ".zip": return "application/zip";
     case ".mp4": return "video/mp4";
-    default:
-      return "application/octet-stream";
+    default: return "application/octet-stream";
   }
 }
 
 /* =========================
- *  GUARDIA DE BUCKET
- * ========================= */
-
-function ensureBucket() {
-  if (!bucket || !GCP_BUCKET_NAME) {
-    throw new Error(
-      "GCS no está configurado: falta GCP_BUCKET_NAME. " +
-        "Configúralo en las variables de entorno del backend."
-    );
-  }
-  return bucket;
-}
-
-/* =========================
- *  SUBIDAS
+ * SUBIDAS
  * ========================= */
 
 export async function uploadBuffer(
@@ -228,11 +158,14 @@ export async function uploadBuffer(
   if (shouldPublic) {
     try {
       await file.makePublic();
+      return {
+        gsUri: toGsUri(key),
+        url: publicObjectUrl(key),
+        consoleUrl: cloudConsoleUrl(key),
+      };
     } catch (err: any) {
-      if (!String(err?.message || "").includes("uniform bucket-level access")) throw err;
-      return { gsUri: toGsUri(key), consoleUrl: cloudConsoleUrl(key) };
+      console.warn("[GCS] No se pudo hacer público el objeto:", err.message);
     }
-    return { gsUri: toGsUri(key), url: publicObjectUrl(key), consoleUrl: cloudConsoleUrl(key) };
   }
 
   return { gsUri: toGsUri(key), consoleUrl: cloudConsoleUrl(key) };
@@ -257,7 +190,7 @@ export async function uploadJson(objectPath: string, data: unknown) {
 }
 
 /* =========================
- *  LECTURA
+ * LECTURA
  * ========================= */
 
 export async function readBuffer(objectPath: string): Promise<Buffer> {
@@ -270,114 +203,6 @@ export async function readBuffer(objectPath: string): Promise<Buffer> {
 export async function readJson<T = any>(objectPath: string): Promise<T> {
   const buf = await readBuffer(objectPath);
   return JSON.parse(buf.toString("utf-8")) as T;
-}
-
-/* =========================
- *  URLS (firmadas o públicas)
- * ========================= */
-
-export async function getSignedReadUrl(objectPath: string, minutes = 60) {
-  const b = ensureBucket();
-  const key = withPrefix(objectPath);
-  const [url] = await b.file(key).getSignedUrl({
-    version: "v4",
-    action: "read",
-    expires: Date.now() + minutes * 60 * 1000,
-  } as GetSignedUrlConfig);
-  return url;
-}
-
-/**
- * Devuelve una URL lista para usar en <img src> o fetch:
- * - Si el bucket es público → devuelve pública (direct o console según CFG.URL_STYLE)
- * - Si es privado → devuelve URL firmada v4
- */
-export async function ensureReadUrl(objectPath: string, minutes = 60) {
-  if (isPublic) {
-    return publicObjectUrl(objectPath);
-  }
-  return getSignedReadUrl(objectPath, minutes);
-}
-
-/* =========================
- *  LISTADOS (para historial)
- * ========================= */
-
-function isImageKey(name: string) {
-  return /\.(png|jpe?g|webp|gif|avif)$/i.test(name);
-}
-function isJsonKey(name: string) {
-  return /\.json$/i.test(name);
-}
-
-export type GcsFileInfo = {
-  name: string;
-  size?: number;
-  updated?: string;
-  contentType?: string;
-  url?: string;
-  consoleUrl?: string;
-};
-
-export async function listPrefixes(prefix: string): Promise<string[]> {
-  const b = ensureBucket();
-  const pfx = withPrefix(prefix).replace(/^\/+/, "").replace(/\/?$/, "/");
-  const [, , apiResponse] = (await b.getFiles({
-    prefix: pfx,
-    delimiter: "/",
-  })) as any;
-  const prefixes: string[] = (apiResponse as any)?.prefixes ?? [];
-  return Array.isArray(prefixes) ? prefixes : [];
-}
-
-export async function listEmailV2BatchIds(): Promise<string[]> {
-  const prefixes = await listPrefixes("emails_v2/");
-  return prefixes
-    .map((full) => String(full || "").replace(/\/$/, ""))
-    .map((full) => full.split("/").slice(-1)[0])
-    .filter(Boolean)
-    .sort()
-    .reverse();
-}
-
-export async function listFilesByPrefix(prefix: string, minutes = 60): Promise<GcsFileInfo[]> {
-  const b = ensureBucket();
-  const pfx = withPrefix(prefix).replace(/^\/+/, "");
-  const [files] = await b.getFiles({ prefix: pfx });
-  const infos = await Promise.all(
-    files.map(async (f) => {
-      const name = f.name;
-      const meta = f.metadata || {};
-      let url: string | undefined = undefined;
-      try {
-        url = await ensureReadUrl(name, minutes);
-      } catch {
-        url = undefined;
-      }
-      return {
-        name,
-        size: Number(meta.size || 0),
-        updated: (meta as any)?.updated || (meta as any)?.timeUpdated,
-        contentType: (meta as any)?.contentType,
-        url,
-        consoleUrl: cloudConsoleUrl(name),
-      } as GcsFileInfo;
-    })
-  );
-  return infos;
-}
-
-export async function listFilesByBatch(batchId: string, minutes = 60): Promise<{
-  prefix: string;
-  files: GcsFileInfo[];
-  images: GcsFileInfo[];
-  jsons: GcsFileInfo[];
-}> {
-  const prefix = `emails_v2/${batchId}/`;
-  const files = await listFilesByPrefix(prefix, minutes);
-  const images = files.filter((f) => isImageKey(f.name));
-  const jsons = files.filter((f) => isJsonKey(f.name));
-  return { prefix: withPrefix(prefix), files, images, jsons };
 }
 
 export async function objectExists(objectPath: string): Promise<boolean> {
@@ -397,11 +222,9 @@ export async function getObjectUpdatedAtMs(objectPath: string): Promise<number> 
     const key = withPrefix(objectPath);
     const [meta] = await b.file(key).getMetadata();
     const updatedStr =
-      (meta as any)?.updated ??
-      (meta as any)?.timeUpdated ??
-      (meta as any)?.metadata?.updated ??
-      null;
-    if (typeof updatedStr === "string" && updatedStr.length > 0) {
+      meta.updated || (meta as any).timeUpdated || (meta.metadata as any)?.updated;
+    
+    if (updatedStr) {
       const ms = Date.parse(updatedStr);
       return Number.isNaN(ms) ? 0 : ms;
     }
@@ -409,4 +232,110 @@ export async function getObjectUpdatedAtMs(objectPath: string): Promise<number> 
   } catch {
     return 0;
   }
+}
+
+/* =========================
+ * URLS FIRMADAS
+ * ========================= */
+
+export async function getSignedReadUrl(objectPath: string, minutes = 60) {
+  const b = ensureBucket();
+  const key = withPrefix(objectPath);
+  const [url] = await b.file(key).getSignedUrl({
+    version: "v4",
+    action: "read",
+    expires: Date.now() + minutes * 60 * 1000,
+  } as GetSignedUrlConfig);
+  return url;
+}
+
+export async function ensureReadUrl(objectPath: string, minutes = 60) {
+  if (isPublic) {
+    return publicObjectUrl(objectPath);
+  }
+  return getSignedReadUrl(objectPath, minutes);
+}
+
+/* =========================
+ * LISTADOS
+ * ========================= */
+
+export async function listPrefixes(prefix: string): Promise<string[]> {
+  const b = ensureBucket();
+  const pfx = withPrefix(prefix).replace(/^\/+/, "").replace(/\/?$/, "/");
+  
+  const [, , apiResponse] = (await b.getFiles({
+    prefix: pfx,
+    delimiter: "/",
+    autoPaginate: false,
+  })) as any;
+  
+  const prefixes: string[] = apiResponse?.prefixes || [];
+  return Array.isArray(prefixes) ? prefixes : [];
+}
+
+export async function listEmailV2BatchIds(): Promise<string[]> {
+  const prefixes = await listPrefixes("emails_v2/");
+  return prefixes
+    .map((full) => String(full || "").replace(/\/$/, "")) 
+    .map((full) => full.split("/").pop()) 
+    .filter((id): id is string => !!id)
+    .sort()
+    .reverse();
+}
+
+export type GcsFileInfo = {
+  name: string;
+  size?: number;
+  updated?: string;
+  contentType?: string;
+  url?: string;
+  consoleUrl?: string;
+};
+
+export async function listFilesByPrefix(prefix: string, minutes = 60): Promise<GcsFileInfo[]> {
+  const b = ensureBucket();
+  const pfx = withPrefix(prefix).replace(/^\/+/, "");
+  const [files] = await b.getFiles({ prefix: pfx });
+  
+  const infos = await Promise.all(
+    files.map(async (f) => {
+      const name = f.name;
+      const meta = f.metadata || {};
+      let url: string | undefined;
+      try {
+        url = await ensureReadUrl(name, minutes);
+      } catch { /* ignore */ }
+      
+      return {
+        name,
+        size: Number(meta.size || 0),
+        updated: meta.updated,
+        contentType: meta.contentType,
+        url,
+        consoleUrl: cloudConsoleUrl(name),
+      } as GcsFileInfo;
+    })
+  );
+  return infos;
+}
+
+function isImageKey(name: string) {
+  return /\.(png|jpe?g|webp|gif|avif)$/i.test(name);
+}
+function isJsonKey(name: string) {
+  return /\.json$/i.test(name);
+}
+
+export async function listFilesByBatch(batchId: string, minutes = 60): Promise<{
+  prefix: string;
+  files: GcsFileInfo[];
+  images: GcsFileInfo[];
+  jsons: GcsFileInfo[];
+}> {
+  const prefix = `emails_v2/${batchId}/`;
+  const files = await listFilesByPrefix(prefix, minutes);
+  const images = files.filter((f) => isImageKey(f.name));
+  const jsons = files.filter((f) => isJsonKey(f.name));
+  return { prefix: withPrefix(prefix), files, images, jsons };
 }

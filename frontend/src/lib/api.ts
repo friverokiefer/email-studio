@@ -4,13 +4,13 @@
  * Configuración base de API
  *
  * - Dev (npm run dev):
- *    API_BASE = ""  → el frontend llama a /api/... y Vite hace proxy al backend
- *    (ver frontend/vite.config.ts)
+ * API_BASE = ""  → el frontend llama a /api/... y Vite hace proxy al backend
+ * (ver frontend/vite.config.ts)
  *
  * - Prod/Stage (build + Cloud Run):
- *    API_BASE:
- *      1) Si VITE_API_BASE viene en el build → se usa esa.
- *      2) Si NO viene → fallback fijo al backend Cloud Run.
+ * API_BASE:
+ * 1) Si VITE_API_BASE viene en el build → se usa esa.
+ * 2) Si NO viene → fallback fijo al backend Cloud Run.
  */
 
 const IS_DEV = (import.meta as any).env?.DEV as boolean;
@@ -164,13 +164,27 @@ export function absoluteImageUrl(url?: string): string {
   return `${base}${path}`;
 }
 
+// === DEFINICIÓN DE TIPOS PARA RESPUESTA DE UPLOAD ===
+export type UploadGCPResponse = {
+  objectRoot?: string;
+  uploaded?: {
+    files?: string[];
+    json?: { url?: string; consoleUrl?: string };
+    manifest?: { url?: string; consoleUrl?: string };
+  };
+  fileCount?: {
+    total?: number;
+    nonJson?: number;
+  };
+};
+
 /**
  * Sube un lote completo a GCP llamando al backend.
- * @deprecated Preferir el flujo nuevo de Email 2.0 cuando sea posible.
+ * Ahora retorna UploadGCPResponse para evitar errores de TS en el Sidebar.
  */
 export async function uploadToGCP(
   batchId: string,
   type: "emails" | "emails_v2" | "blog" | "ads" | "social" | "meta" = "emails_v2"
-): Promise<unknown> {
-  return postJson("/api/upload-to-gcp", { batchId, type });
+): Promise<UploadGCPResponse> {
+  return postJson<UploadGCPResponse>("/api/upload-to-gcp", { batchId, type });
 }
