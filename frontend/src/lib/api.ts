@@ -11,7 +11,7 @@ const IS_DEV = Boolean((import.meta as any).env?.DEV);
 
 export const API_BASE: string =
   (RAW_API_BASE && RAW_API_BASE.replace(/\/+$/, "")) ||
-  (IS_DEV ? "" : "http://localhost:8080");
+  (IS_DEV ? "" : "https://backendv06-151554496273.europe-west1.run.app"); // http://localhost:8080.
 
 type TimeoutOptions = { timeoutMs?: number };
 
