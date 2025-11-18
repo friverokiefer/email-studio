@@ -1,7 +1,8 @@
+// backend/src/server.ts
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 
-// 👉 Importamos SOLO el router de historial para no reventar nada más
+// 👉 Router de historial (ya lo tienes implementado)
 import { historyRouter } from "./routes/history";
 
 // ======================================================
@@ -16,7 +17,8 @@ app.use(express.urlencoded({ extended: true }));
 // CORS
 // - En dev: origin true (lo que sea)
 // - En prod: idealmente restringir a tu dominio de frontend
-const allowedOriginsEnv = process.env.CORS_ORIGINS; // ej: "https://frontendvo06-...run.app"
+//   ej: CORS_ORIGINS="https://frontendvo06-151554496273.europe-west1.run.app"
+const allowedOriginsEnv = process.env.CORS_ORIGINS;
 const allowedOrigins = allowedOriginsEnv
   ? allowedOriginsEnv.split(",").map((s) => s.trim())
   : true;
@@ -44,20 +46,31 @@ app.get("/ready", (_req: Request, res: Response) => {
   res.json({ status: "ready" });
 });
 
+// 🔍 Endpoint de debug para ver variables de entorno
+// ⚠️ IMPORTANTE: esto es solo para pruebas, luego lo deberías borrar o proteger.
+app.get("/env-check", (_req: Request, res: Response) => {
+  res.json({
+    NODE_ENV: process.env.NODE_ENV,
+    PORT: process.env.PORT,
+    GCP_PROJECT_ID: process.env.GCP_PROJECT_ID,
+    GCP_BUCKET_NAME: process.env.GCP_BUCKET_NAME,
+    GCP_PREFIX: process.env.GCP_PREFIX,
+    GCP_PUBLIC_READ: process.env.GCP_PUBLIC_READ,
+    GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+  });
+});
+
 // ======================================================
 // 3. Rutas de API (v1)
 // ======================================================
 
 // Historial de emails v2
 // El frontend está llamando: GET /api/history?type=emails_v2
-// Así que aquí montamos el router en ese path base.
 app.use("/api/history", historyRouter);
 
-// 👉 Más adelante podemos ir sumando:
-// import generateEmailV2Router from "./routes/generateEmailV2";
-// import metaEmailV2Router from "./routes/emailV2Meta";
+// 👉 Más adelante agregaremos:
+// import { router as generateEmailV2Router } from "./routes/generateEmailV2";
 // app.use("/api/email-v2", generateEmailV2Router);
-// app.use("/api/email-v2/meta", metaEmailV2Router);
 // etc.
 
 // ======================================================
