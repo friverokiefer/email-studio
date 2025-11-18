@@ -7,10 +7,10 @@
  *    API_BASE = ""  → el frontend llama a /api/... y Vite hace proxy al backend
  *    (ver frontend/vite.config.ts)
  *
- * - Prod/Stage (npm run build):
- *    API_BASE = VITE_API_BASE (sin slash final)
- *    Ejemplo .env.production:
- *      VITE_API_BASE=https://backend-151554496273.europe-west1.run.app/
+ * - Prod/Stage (build + Cloud Run):
+ *    API_BASE:
+ *      1) Si VITE_API_BASE viene en el build → se usa esa.
+ *      2) Si NO viene → fallback fijo al backend Cloud Run.
  */
 
 const IS_DEV = (import.meta as any).env?.DEV as boolean;
@@ -18,24 +18,32 @@ const RAW_API_BASE = (import.meta as any).env?.VITE_API_BASE as
   | string
   | undefined;
 
+// 🔴 AJUSTA AQUÍ si cambia la URL del backend
+const PROD_FALLBACK_API_BASE =
+  "https://backend-151554496273.europe-west1.run.app";
+
 function normalizeBase(base: string | undefined): string {
   if (!base) return "";
   return base.replace(/\/+$/, "");
 }
 
 // En dev usamos proxy → ""
-// En prod esperamos SIEMPRE VITE_API_BASE configurada
-const API_BASE_INTERNAL: string = IS_DEV ? "" : normalizeBase(RAW_API_BASE);
+// En prod: VITE_API_BASE si existe, si no, fallback fijo
+let API_BASE_INTERNAL: string;
 
-if (!IS_DEV && !API_BASE_INTERNAL) {
-  // Si ves este log en prod, te faltó VITE_API_BASE en el build.
-  // Mejor fallar ruidoso que quedarnos pegados a un backend incorrecto.
-  // eslint-disable-next-line no-console
-  console.warn(
-    "[api.ts] VITE_API_BASE no definida en producción. " +
-      "Las llamadas irán a rutas relativas (/api/...). " +
-      "Revisa tu .env.production o variables del build."
-  );
+if (IS_DEV) {
+  API_BASE_INTERNAL = "";
+} else {
+  const fromEnv = normalizeBase(RAW_API_BASE);
+  API_BASE_INTERNAL = fromEnv || PROD_FALLBACK_API_BASE;
+
+  if (!fromEnv) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[api.ts] VITE_API_BASE no definida en build; usando fallback:",
+      PROD_FALLBACK_API_BASE
+    );
+  }
 }
 
 export const API_BASE: string = API_BASE_INTERNAL;
