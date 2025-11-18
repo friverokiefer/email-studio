@@ -3,7 +3,6 @@
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 
-import { CFG } from "./services/gcpStorage";
 import { historyRouter } from "./routes/history";
 import { emailV2MetaRouter } from "./routes/emailV2Meta";
 import { metaEmailV2Router } from "./routes/metaEmailV2";
@@ -13,6 +12,8 @@ import {
 } from "./routes/generateEmailV2";
 import { generatedRouter } from "./routes/generated";
 import { sfmcRouter } from "./routes/sfmc";
+
+import { CFG } from "./services/gcpStorage";
 
 // ======================================================
 // 1. Config básica de app
@@ -24,32 +25,24 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // CORS
-const allowedOriginsEnv = process.env.CORS_ORIGINS; // ej: "https://frontendvo06-....run.app"
-let corsOrigin: any = true;
-
-if (allowedOriginsEnv) {
-  const whitelist = allowedOriginsEnv
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  corsOrigin = (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
-    if (!origin) return cb(null, true); // curl / pruebas internas
-    if (whitelist.includes(origin)) return cb(null, true);
-    console.warn("[CORS] origin no permitido:", origin);
-    return cb(null, false);
-  };
-}
+// CORS_ORIGINS puede ser:
+// - undefined  → permite cualquier origen (true)
+// - "https://front.run.app"  → un solo origen
+// - "https://front.run.app,https://otro.run.app" → varios
+const allowedOriginsEnv = process.env.CORS_ORIGINS;
+const allowedOrigins = allowedOriginsEnv
+  ? allowedOriginsEnv.split(",").map((s) => s.trim())
+  : true;
 
 app.use(
   cors({
-    origin: corsOrigin,
+    origin: allowedOrigins,
     credentials: false,
   })
 );
 
 // ======================================================
-// 2. Health checks y debug
+// 2. Health checks
 // ======================================================
 
 app.get("/", (_req: Request, res: Response) => {
@@ -64,7 +57,7 @@ app.get("/ready", (_req: Request, res: Response) => {
   res.json({ status: "ready" });
 });
 
-// Solo para debug puntual (puedes borrarlo más adelante)
+// Debug de entorno (solo para pruebas; en producción puedes quitarlo o protegerlo)
 app.get("/env-check", (_req: Request, res: Response) => {
   res.json({
     NODE_ENV: process.env.NODE_ENV,
@@ -73,7 +66,8 @@ app.get("/env-check", (_req: Request, res: Response) => {
     GCP_BUCKET_NAME: process.env.GCP_BUCKET_NAME,
     GCP_PREFIX: process.env.GCP_PREFIX,
     GCP_PUBLIC_READ: process.env.GCP_PUBLIC_READ,
-    GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS || null,
+    GOOGLE_APPLICATION_CREDENTIALS:
+      process.env.GOOGLE_APPLICATION_CREDENTIALS || null,
     CFG,
   });
 });
@@ -82,31 +76,33 @@ app.get("/env-check", (_req: Request, res: Response) => {
 // 3. Rutas de API
 // ======================================================
 
-// Historial de lotes (sidebar)
+// Historial de lotes (lee directo desde GCS: emails_v2/<batchId>/batch.json)
 app.use("/api/history", historyRouter);
 
-// Catálogo de campañas + clusters (usado por el frontend)
+// Meta Email 2.0 (campañas / clusters) – ruta principal usada por el frontend:
 // GET /api/email-v2/meta
 app.use("/api/email-v2", emailV2MetaRouter);
 
-// Alias plural (por si en algún momento el front usa /api/emails-v2/meta)
+// Alias plural para compatibilidad futura:
+// GET /api/emails-v2/meta
 app.use("/api/emails-v2/meta", metaEmailV2Router);
 
-// Generación de emails v2 (texto + imágenes)
+// Generación de Email 2.0 (texto + imágenes) y edición:
 // POST /api/generate-emails-v2
 // POST /api/generate-emails-v2/render-email-html
 app.use("/api/generate-emails-v2", generateEmailsV2Router);
 
-// Guardar edición de sets
-// PUT /api/emails-v2/:batchId
+// PUT /api/emails-v2/:batchId  (guardar sets editados)
 app.use("/api/emails-v2", emailsV2Router);
 
-// Acceso a batch.json + redirect de imágenes
-// GET /api/generated/emails_v2/:batchId/batch.json
-// GET /api/generated/emails_v2/:batchId/*
+// Enlaces para JSON e imágenes ya generadas:
+// - GET /api/generated/emails_v2/:batchId/batch.json
+// - GET /generated/emails_v2/:batchId/batch.json
+// - GET /api/generated/emails_v2/:batchId/*
+// - GET /generated/emails_v2/:batchId/*
 app.use(generatedRouter);
 
-// Integración con Salesforce Marketing Cloud
+// Integración con SFMC (borradores de email):
 // POST /api/sfmc/draft-email
 app.use("/api/sfmc", sfmcRouter);
 
@@ -114,7 +110,7 @@ app.use("/api/sfmc", sfmcRouter);
 // 4. Manejo de errores
 // ======================================================
 
-// 404
+// 404 genérico
 app.use((req: Request, res: Response) => {
   res.status(404).json({
     error: "Not Found",
@@ -122,7 +118,6 @@ app.use((req: Request, res: Response) => {
   });
 });
 
-// 500 / errores no controlados
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error("🔥 Unhandled error in backend:", err);
