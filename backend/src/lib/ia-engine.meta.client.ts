@@ -1,5 +1,7 @@
 // backend/src/lib/ia-engine.meta.client.ts
 import "dotenv/config";
+import * as constants from "../utils/constants";
+import { IA_ENGINE_BASE_URL, IA_ENGINE_ENABLED } from "../services/iaEngine";
 
 /**
  * Cliente para obtener la metadata del IA Engine (Email V2):
@@ -18,18 +20,22 @@ export type IaEngineMeta = {
 };
 
 /* ============================================================
- * Configuración base URL (igual criterio que services/iaEngine.ts)
+ * Catálogos desde constants.ts (fallback estático)
  * ============================================================ */
 
-// Puerto por defecto del IA Engine en LOCAL (cuando lo corres a mano)
-const DEFAULT_BASE_URL = "http://127.0.0.1:8000";
+const CAMPAIGNS: string[] = Array.isArray((constants as any).CAMPAIGNS)
+  ? [...((constants as any).CAMPAIGNS as readonly string[])]
+  : [];
 
-const rawBase = process.env.IA_ENGINE_BASE_URL || DEFAULT_BASE_URL;
+const CLUSTERS: string[] = Array.isArray((constants as any).CLUSTERS)
+  ? [...((constants as any).CLUSTERS as string[])]
+  : [];
 
-// Normalizamos URL (evita "localhost" y elimina "/" final)
-export const IA_ENGINE_META_BASE_URL = rawBase
-  .replace("localhost", "127.0.0.1")
-  .replace(/\/+$/, "");
+const RAW_CAMPAIGN_CLUSTERS: Record<string, string[]> | undefined =
+  (constants as any).CAMPAIGN_CLUSTERS &&
+  typeof (constants as any).CAMPAIGN_CLUSTERS === "object"
+    ? ((constants as any).CAMPAIGN_CLUSTERS as Record<string, string[]>)
+    : undefined;
 
 /* ============================================================
  * Helper: fetch con timeout
@@ -52,16 +58,18 @@ async function fetchWithTimeout(
     return res;
   } catch (err: any) {
     clearTimeout(id);
-    throw new Error(`IA Engine meta network/timeout error: ${err?.message || err}`);
+    throw new Error(
+      `IA Engine meta network/timeout error: ${err?.message || err}`
+    );
   }
 }
 
 /* ============================================================
- * Cliente crudo: llama al /ia/meta del motor Python
+ * Meta desde IA Engine (Python)
  * ============================================================ */
 
-export async function fetchIaEngineMeta(): Promise<IaEngineMeta> {
-  const url = `${IA_ENGINE_META_BASE_URL}/ia/meta`;
+async function fetchMetaFromIaEngine(): Promise<IaEngineMeta> {
+  const url = `${IA_ENGINE_BASE_URL}/ia/meta`;
 
   console.log("\n====================================");
   console.log("[iaEngine.meta] GET →", url);
@@ -85,7 +93,9 @@ export async function fetchIaEngineMeta(): Promise<IaEngineMeta> {
     }
 
     throw new Error(
-      `IA Engine /ia/meta responded ${res.status}: ${text || res.statusText}`
+      `IA Engine /ia/meta responded ${res.status}: ${
+        text || res.statusText
+      }`
     );
   }
 
@@ -96,17 +106,70 @@ export async function fetchIaEngineMeta(): Promise<IaEngineMeta> {
     throw new Error(`IA Engine /ia/meta JSON parse error: ${err}`);
   }
 
-  const data = raw as IaEngineMeta;
+  const data = raw as Partial<IaEngineMeta>;
 
   if (!data || !Array.isArray(data.campaigns) || !Array.isArray(data.clusters)) {
-    throw new Error("IA Engine /ia/meta payload inválido (faltan campaigns/clusters).");
+    throw new Error(
+      "IA Engine /ia/meta payload inválido (faltan campaigns/clusters)."
+    );
   }
 
-  return data;
+  const campaignClusters: Record<string, string[]> = {};
+  if (data.campaignClusters && typeof data.campaignClusters === "object") {
+    for (const [k, v] of Object.entries(data.campaignClusters)) {
+      campaignClusters[String(k)] = Array.isArray(v)
+        ? v.map((x) => String(x))
+        : [];
+    }
+  }
+
+  const meta: IaEngineMeta = {
+    campaigns: data.campaigns.map((c) => String(c)),
+    clusters: data.clusters.map((c) => String(c)),
+    campaignClusters,
+    benefits: data.benefits,
+    ctas: data.ctas,
+    subjects: data.subjects,
+    clusterTone: data.clusterTone,
+  };
+
+  console.log("[iaEngine.meta] ✔️ Meta desde IA Engine:", {
+    campaigns: meta.campaigns.length,
+    clusters: meta.clusters.length,
+  });
+
+  return meta;
 }
 
 /* ============================================================
- * Cache sencillo en memoria para no pegarle siempre a IA Engine
+ * Fallback estático con constants.ts
+ * ============================================================ */
+
+function buildFallbackMeta(): IaEngineMeta {
+  const campaigns = CAMPAIGNS.length ? [...CAMPAIGNS] : [];
+  const clusters = CLUSTERS.length ? [...CLUSTERS] : [];
+
+  const campaignClusters: Record<string, string[]> = {};
+
+  if (RAW_CAMPAIGN_CLUSTERS && Object.keys(RAW_CAMPAIGN_CLUSTERS).length > 0) {
+    // Tenemos mapa fino desde constants.ts
+    for (const [campaign, list] of Object.entries(RAW_CAMPAIGN_CLUSTERS)) {
+      campaignClusters[campaign] = Array.isArray(list) ? [...list] : [];
+    }
+  } else {
+    // Fallback genérico: todas las campañas ven todos los clusters
+    for (const c of campaigns) {
+      campaignClusters[c] = [...clusters];
+    }
+  }
+
+  console.log("[iaEngine.meta] ⚠️ Usando fallback estático de constants.ts");
+
+  return { campaigns, clusters, campaignClusters };
+}
+
+/* ============================================================
+ * Cache sencillo en memoria
  * ============================================================ */
 
 let _metaCache: {
@@ -119,20 +182,48 @@ let _metaCache: {
 
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
 
-export async function getIaEngineMetaCached(
-  options?: { forceRefresh?: boolean }
-): Promise<IaEngineMeta> {
+/* ============================================================
+ * API principal: getIaEngineMetaCached
+ * ============================================================ */
+
+export async function getIaEngineMetaCached(options?: {
+  forceRefresh?: boolean;
+}): Promise<IaEngineMeta> {
   const now = Date.now();
   const force = options?.forceRefresh === true;
 
+  // Cache aún válido
   if (!force && _metaCache.data && now - _metaCache.fetchedAt < CACHE_TTL_MS) {
     return _metaCache.data;
   }
 
-  const meta = await fetchIaEngineMeta();
+  // 1) Intentar IA Engine si está habilitado
+  if (IA_ENGINE_ENABLED) {
+    try {
+      const meta = await fetchMetaFromIaEngine();
+      _metaCache = {
+        data: meta,
+        fetchedAt: now,
+      };
+      return meta;
+    } catch (err) {
+      console.warn(
+        "[iaEngine.meta] IA Engine no disponible, usando fallback estático:",
+        err
+      );
+      // caemos a fallback
+    }
+  } else {
+    console.log(
+      "[iaEngine.meta] IA_ENGINE_ENABLED=0/false → usando meta estático (constants.ts)"
+    );
+  }
+
+  // 2) Fallback estático desde constants.ts
+  const fallback = buildFallbackMeta();
   _metaCache = {
-    data: meta,
+    data: fallback,
     fetchedAt: now,
   };
-  return meta;
+  return fallback;
 }
