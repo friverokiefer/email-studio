@@ -1,7 +1,8 @@
-// backend/src/server.ts
-
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
+
+// 👉 Importamos SOLO el router de historial para no reventar nada más
+import { historyRouter } from "./routes/history";
 
 // ======================================================
 // 1. Config básica de app
@@ -12,10 +13,17 @@ const app = express();
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// CORS básico: para pruebas dejamos origin: true
+// CORS
+// - En dev: origin true (lo que sea)
+// - En prod: idealmente restringir a tu dominio de frontend
+const allowedOriginsEnv = process.env.CORS_ORIGINS; // ej: "https://frontendvo06-...run.app"
+const allowedOrigins = allowedOriginsEnv
+  ? allowedOriginsEnv.split(",").map((s) => s.trim())
+  : true;
+
 app.use(
   cors({
-    origin: true, // luego restringimos al dominio del frontend
+    origin: allowedOrigins,
     credentials: false,
   })
 );
@@ -25,7 +33,7 @@ app.use(
 // ======================================================
 
 app.get("/", (_req: Request, res: Response) => {
-  res.send("email-studio backend: OK (minimal server)");
+  res.send("email-studio backend: OK");
 });
 
 app.get("/health", (_req: Request, res: Response) => {
@@ -37,9 +45,26 @@ app.get("/ready", (_req: Request, res: Response) => {
 });
 
 // ======================================================
-// 3. Manejo de errores genérico
+// 3. Rutas de API (v1)
 // ======================================================
 
+// Historial de emails v2
+// El frontend está llamando: GET /api/history?type=emails_v2
+// Así que aquí montamos el router en ese path base.
+app.use("/api/history", historyRouter);
+
+// 👉 Más adelante podemos ir sumando:
+// import generateEmailV2Router from "./routes/generateEmailV2";
+// import metaEmailV2Router from "./routes/emailV2Meta";
+// app.use("/api/email-v2", generateEmailV2Router);
+// app.use("/api/email-v2/meta", metaEmailV2Router);
+// etc.
+
+// ======================================================
+// 4. Manejo de errores genérico
+// ======================================================
+
+// 404
 app.use((req: Request, res: Response) => {
   res.status(404).json({
     error: "Not Found",
@@ -47,6 +72,7 @@ app.use((req: Request, res: Response) => {
   });
 });
 
+// 500 / errores no controlados
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error("🔥 Unhandled error in backend:", err);
@@ -62,7 +88,7 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 // ======================================================
-// 4. Arranque del servidor
+// 5. Arranque del servidor
 // ======================================================
 
 const port = Number(process.env.PORT) || 8080;
