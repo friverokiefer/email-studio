@@ -1,122 +1,73 @@
 // backend/src/server.ts
-import express from "express";
+
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
-import path from "path";
 
-// Rutas principales Email 2.0
-import {
-  generateEmailsV2Router,
-  emailsV2Router,
-} from "./routes/generateEmailV2";
-import { historyRouter } from "./routes/history";
-import generatedRouter from "./routes/generated";
-import { sfmcRouter } from "./routes/sfmc";
-
-// Meta (catálogo campañas / clusters)
-import { emailV2MetaRouter } from "./routes/emailV2Meta";
-import { metaEmailV2Router } from "./routes/metaEmailV2";
+// ======================================================
+// 1. Config básica de app
+// ======================================================
 
 const app = express();
-app.set("trust proxy", true);
 
-// ===== CORS con lista blanca =====
-/**
- * Orígenes permitidos:
- * - Lee FRONTEND_ORIGINS (coma-separado)
- * - Defaults seguros para dev (Vite y Docker front)
- */
-const defaultAllowed = [
-  "http://localhost:5173", // Vite dev
-  "http://localhost:8081", // Front en Docker local
-];
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
 
-const envAllowed = (process.env.FRONTEND_ORIGINS || "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
-
-const allowedOrigins = [...new Set([...defaultAllowed, ...envAllowed])];
-
+// CORS básico: para pruebas dejamos origin: true
 app.use(
   cors({
-    origin: (origin, cb) => {
-      // Requests sin Origin (curl/healthchecks) se permiten
-      if (!origin) return cb(null, true);
-      if (allowedOrigins.includes(origin)) return cb(null, true);
-      return cb(new Error(`Origin not allowed: ${origin}`));
-    },
+    origin: true, // luego restringimos al dominio del frontend
     credentials: false,
   })
 );
 
-// ===== Body parsers (tamaños grandes por base64 de imágenes) =====
-app.use(express.json({ limit: "25mb" }));
-app.use(express.urlencoded({ extended: true, limit: "25mb" }));
+// ======================================================
+// 2. Health checks (para Cloud Run y pruebas locales)
+// ======================================================
 
-// ===== Static /generated (fallback local en disco) =====
-const GENERATED_DIR =
-  (process.env.GENERATED_BASE_PATH &&
-    path.resolve(process.env.GENERATED_BASE_PATH)) ||
-  path.resolve(__dirname, "..", "public", "generated");
-console.log("🖼  Local /generated fallback dir:", GENERATED_DIR);
+app.get("/", (_req: Request, res: Response) => {
+  res.send("email-studio backend: OK (minimal server)");
+});
 
-// ====== Rutas API ======
+app.get("/health", (_req: Request, res: Response) => {
+  res.json({ status: "ok" });
+});
 
-// Meta Email 2.0 (consumida por el frontend)
-// → GET /api/email-v2/meta
-app.use("/api/email-v2", emailV2MetaRouter);
+app.get("/ready", (_req: Request, res: Response) => {
+  res.json({ status: "ready" });
+});
 
-// Alias plural opcional (por si lo usa otra pieza o scripts internos)
-// → GET /api/emails-v2/meta
-app.use("/api/emails-v2/meta", metaEmailV2Router);
+// ======================================================
+// 3. Manejo de errores genérico
+// ======================================================
 
-// Generación y edición de Email 2.0
-// → POST /api/generate-emails-v2
-app.use("/api/generate-emails-v2", generateEmailsV2Router);
-// → PUT /api/emails-v2/:batchId
-app.use("/api/emails-v2", emailsV2Router);
+app.use((req: Request, res: Response) => {
+  res.status(404).json({
+    error: "Not Found",
+    path: req.path,
+  });
+});
 
-// Historial y SFMC
-// → GET /api/history?type=emails_v2
-app.use("/api/history", historyRouter);
-// → POST /api/sfmc/draft-email
-app.use("/api/sfmc", sfmcRouter);
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  console.error("🔥 Unhandled error in backend:", err);
 
-// Rutas /api/generated y /generated (JSON + redirect a GCS)
-app.use(generatedRouter);
+  const status = err.status || 500;
+  res.status(status).json({
+    error: "Internal Server Error",
+    message:
+      process.env.NODE_ENV === "production"
+        ? "Unexpected error"
+        : String(err?.message || err),
+  });
+});
 
-// Static local (último, como fallback)
-app.use(
-  "/generated",
-  express.static(GENERATED_DIR, {
-    fallthrough: true,
-    maxAge: "1h",
-    etag: true,
-  })
-);
+// ======================================================
+// 4. Arranque del servidor
+// ======================================================
 
-// ===== Health endpoints =====
-app.get("/healthz", (_req, res) => res.status(200).send("ok"));
-app.get("/readyz", (_req, res) => res.status(200).send("ready"));
+const port = Number(process.env.PORT) || 8080;
 
-// ===== Error handler (último) =====
-app.use(
-  (
-    err: any,
-    _req: express.Request,
-    res: express.Response,
-    _next: express.NextFunction
-  ) => {
-    console.error("🔥 Unhandled error:", err?.stack || err);
-    res.status(500).json({ error: err?.message || "Internal Server Error" });
-  }
-);
-
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(
-    "🌐 Allowed CORS origins:",
-    allowedOrigins.join(", ") || "(none)"
-  );
+app.listen(port, () => {
+  console.log(`✅ email-studio backend escuchando en puerto ${port}`);
+  console.log(`   NODE_ENV=${process.env.NODE_ENV || "undefined"}`);
 });
