@@ -36,11 +36,11 @@ export type EmailV2Image = {
   heroUrl: string; // URL directa (storage.googleapis.com + cache-busting)
   meta?: {
     model?: string;
-    size?: string;            // valor solicitado al modelo
+    size?: string; // valor solicitado al modelo
     quality?: string;
-    width?: number;           // dimensión real del JPG final (post-normalización)
-    height?: number;          // dimensión real del JPG final (post-normalización)
-    sizeNormalized?: string;  // p.ej. "1792x1024"
+    width?: number; // dimensión real del JPG final (post-normalización)
+    height?: number; // dimensión real del JPG final (post-normalización)
+    sizeNormalized?: string; // p.ej. "1792x1024"
   };
 };
 
@@ -48,7 +48,7 @@ type EmailV2Feedback = {
   subject?: string;
   preheader?: string;
   bodyContent?: string; // canonical
-  body?: string;        // compat
+  body?: string; // compat
 };
 
 /* =========================
@@ -66,7 +66,10 @@ function makeBatchId(): string {
 function gcsDirectUrl(objectKey: string, v?: string) {
   const bucket = process.env.GCP_BUCKET_NAME || "";
   const full = withPrefix(objectKey).replace(/^\/+/, "");
-  const encoded = full.split("/").map(encodeURIComponent).join("/");
+  const encoded = full
+    .split("/")
+    .map((encodeURIComponent as any))
+    .join("/");
   const qs = v ? `?v=${encodeURIComponent(v)}` : "";
   return `https://storage.googleapis.com/${bucket}/${encoded}${qs}`;
 }
@@ -100,10 +103,18 @@ function clampChars(s: string, _min: number, max: number) {
   return t;
 }
 
-function sanitizeCopy(raw: { subject: string; preheader: string; body: string; cta?: string }) {
+function sanitizeCopy(raw: {
+  subject: string;
+  preheader: string;
+  body: string;
+  cta?: string;
+}) {
   let { subject, preheader, body, cta } = raw;
 
-  subject = stripEmojis(subject).replace(/[!¡]{2,}/g, "!").replace(/\s+/g, " ").trim();
+  subject = stripEmojis(subject)
+    .replace(/[!¡]{2,}/g, "!")
+    .replace(/\s+/g, " ")
+    .trim();
   preheader = stripEmojis(preheader).replace(/\s+/g, " ").trim();
   body = stripEmojis(body).trim();
 
@@ -139,7 +150,10 @@ function sanitizeHeading(candidate: any, fallback: string): string {
   s = clampChars(s, 0, 60);
   return s;
 }
-function sanitizeSubheading(candidate: any, fallback?: string | null): string | null {
+function sanitizeSubheading(
+  candidate: any,
+  fallback?: string | null
+): string | null {
   let s = String(candidate ?? "").trim();
   s = stripEmojis(s).replace(/\s+/g, " ").trim();
   if (!s) s = String(fallback || "").trim();
@@ -257,8 +271,14 @@ generateEmailsV2Router.post("/", async (req, res) => {
 
     const normalizedFeedback: EmailV2Feedback | undefined = feedback
       ? {
-          subject: typeof feedback.subject === "string" ? feedback.subject : undefined,
-          preheader: typeof feedback.preheader === "string" ? feedback.preheader : undefined,
+          subject:
+            typeof feedback.subject === "string"
+              ? feedback.subject
+              : undefined,
+          preheader:
+            typeof feedback.preheader === "string"
+              ? feedback.preheader
+              : undefined,
           bodyContent:
             typeof feedback.bodyContent === "string"
               ? feedback.bodyContent
@@ -309,7 +329,9 @@ generateEmailsV2Router.post("/", async (req, res) => {
         meta: img?.meta
           ? {
               model: (img.meta as any).model,
-              size: (img.meta as any).size ? String((img.meta as any).size) : undefined,
+              size: (img.meta as any).size
+                ? String((img.meta as any).size)
+                : undefined,
               quality: (img.meta as any).quality,
               width: (img.meta as any).width,
               height: (img.meta as any).height,
@@ -336,7 +358,9 @@ generateEmailsV2Router.post("/", async (req, res) => {
     let iaEngineError: unknown | null = null;
 
     const feedbackWithHero: EmailV2Feedback | undefined = (() => {
-      const line = `Hero image URL (usar tal cual): ${imagesOut[0]?.heroUrl || ""}`;
+      const line = `Hero image URL (usar tal cual): ${
+        imagesOut[0]?.heroUrl || ""
+      }`;
       if (!normalizedFeedback) return { bodyContent: line };
       const baseBody = normalizedFeedback.bodyContent?.trim() || "";
       const mergedBody = baseBody.length > 0 ? `${baseBody}\n${line}` : line;
@@ -364,7 +388,10 @@ generateEmailsV2Router.post("/", async (req, res) => {
           });
 
           const titleClean = sanitizeHeading(t.body?.title ?? "", "");
-          const subtitleClean = sanitizeSubheading(t.body?.subtitle ?? null, null);
+          const subtitleClean = sanitizeSubheading(
+            t.body?.subtitle ?? null,
+            null
+          );
 
           const rawId = t.id ?? idx + 1;
           const idNum = Number(String(rawId).match(/\d+/)?.[0] ?? idx + 1);
@@ -477,7 +504,10 @@ generateEmailsV2Router.post("/", async (req, res) => {
 emailsV2Router.put("/:batchId", async (req, res) => {
   try {
     const batchId = String(req.params.batchId || "");
-    if (!batchId) return res.status(400).json({ ok: false, error: "batchId requerido" });
+    if (!batchId)
+      return res
+        .status(400)
+        .json({ ok: false, error: "batchId requerido" });
 
     const incomingSets = Array.isArray(req.body?.sets) ? req.body.sets : [];
     const sets = sanitizeContentSets(incomingSets);
@@ -591,7 +621,9 @@ generateEmailsV2Router.post("/render-email-html", async (req, res) => {
     } = req.body || {};
 
     if (!data || !data.subject || !data.body) {
-      return res.status(400).json({ ok: false, error: "Faltan 'subject' y 'body' en data." });
+      return res
+        .status(400)
+        .json({ ok: false, error: "Faltan 'subject' y 'body' en data." });
     }
 
     // Resolver hero
@@ -603,7 +635,10 @@ generateEmailsV2Router.post("/render-email-html", async (req, res) => {
         const idx = Math.max(0, Number(selectedImage) - 1);
         const img = Array.isArray(current?.images) ? current.images[idx] : null;
         if (img?.fileName) {
-          heroUrl = gcsDirectUrl(`emails_v2/${batchId}/${img.fileName}`, batchId);
+          heroUrl = gcsDirectUrl(
+            `emails_v2/${batchId}/${img.fileName}`,
+            batchId
+          );
         } else if (img?.heroUrl) {
           heroUrl = String(img.heroUrl);
         }
@@ -632,13 +667,17 @@ generateEmailsV2Router.post("/render-email-html", async (req, res) => {
 
     const fname =
       fileName ||
-      `email_S${String(selectedSet).padStart(2, "0")}_I${String(selectedImage).padStart(
-        2,
-        "0"
-      )}.html`;
+      `email_S${String(selectedSet).padStart(2, "0")}_I${String(
+        selectedImage
+      ).padStart(2, "0")}.html`;
     const key = `emails_v2/${batchId}/${fname}`;
 
-    await uploadBuffer(key, Buffer.from(html, "utf-8"), "text/html; charset=utf-8", true);
+    await uploadBuffer(
+      key,
+      Buffer.from(html, "utf-8"),
+      "text/html; charset=utf-8",
+      true
+    );
 
     return res.json({
       ok: true,
@@ -647,6 +686,8 @@ generateEmailsV2Router.post("/render-email-html", async (req, res) => {
       url: cloudBrowserUrl(key),
     });
   } catch (e: any) {
-    return res.status(500).json({ ok: false, error: e?.message || "Error renderizando HTML" });
+    return res
+      .status(500)
+      .json({ ok: false, error: e?.message || "Error renderizando HTML" });
   }
 });

@@ -146,7 +146,7 @@ export function buildUniqueAssetName(
 /** ================== Endpoints ================== */
 
 export async function getEmailV2Meta(): Promise<EmailV2Meta> {
-  // Contract backend: GET /api/email-v2/meta
+  // Contract backend: GET /api/email-v2/meta (también soporta /meta2 y raíz)
   return apiJson<EmailV2Meta>(
     "/api/email-v2/meta",
     { method: "GET" },

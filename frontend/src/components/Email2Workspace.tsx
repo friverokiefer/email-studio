@@ -1,10 +1,5 @@
 // frontend/src/components/Email2Workspace.tsx
-import React, {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { EmailV2Image, EmailContentSet } from "@/lib/apiEmailV2";
 import { EmailPreview } from "./EmailPreview";
 
@@ -72,6 +67,11 @@ function normalizeSet(t: EmailContentSet): EmailContentSet {
   };
 }
 
+function normalizeSets(arr: EmailContentSet[] | undefined | null): EmailContentSet[] {
+  if (!Array.isArray(arr)) return [];
+  return arr.map((t) => normalizeSet(t));
+}
+
 /** === COMPONENTE ======================================================= */
 export function Email2Workspace({
   batchId,
@@ -89,7 +89,7 @@ export function Email2Workspace({
   onEditedChange?: (sets: EmailContentSet[]) => void;
 }) {
   const [edited, setEdited] = useState<EmailContentSet[]>(() =>
-    (trios || []).map((t) => normalizeSet(t))
+    normalizeSets(trios)
   );
   const [selectedSet, setSelectedSet] = useState<number | null>(
     (trios || []).length ? 0 : null
@@ -104,18 +104,17 @@ export function Email2Workspace({
   useEffect(() => {
     if (prevBatchRef.current !== batchId) {
       prevBatchRef.current = batchId;
-      const norm = (trios || []).map((t) => normalizeSet(t));
+      const norm = normalizeSets(trios);
       setEdited(norm);
       setSelectedSet(norm.length ? 0 : null);
       setSelectedImage(images.length ? 0 : null);
-      return;
     }
-  }, [batchId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [batchId, trios, images]);
 
   // Sincronizar sets cuando cambian desde el padre (mismo batch)
   useEffect(() => {
     if (prevBatchRef.current !== batchId) return;
-    const norm = (trios || []).map((t) => normalizeSet(t));
+    const norm = normalizeSets(trios);
     setEdited(norm);
     setSelectedSet((prev) => {
       if (norm.length === 0) return null;

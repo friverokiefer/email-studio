@@ -9,7 +9,8 @@ export const emailV2MetaRouter = Router();
 
 /**
  * GET /api/email-v2/meta
- * (y alias GET /api/email-v2)
+ * GET /api/email-v2/meta2   (alias para compatibilidad)
+ * GET /api/email-v2         (raíz, mismo catálogo)
  *
  * Endpoint de meta para Email 2.0 consumido por el frontend.
  *
@@ -24,11 +25,13 @@ export const emailV2MetaRouter = Router();
  * Query opcional:
  *   ?refresh=1  → fuerza recarga (ignora caché de Node)
  */
-emailV2MetaRouter.get(["/meta", "/"], async (req, res, next) => {
+async function handleMeta(req: any, res: any, next: any) {
   try {
     const refreshParam = String(req.query.refresh || "").toLowerCase();
     const forceRefresh =
-      refreshParam === "1" || refreshParam === "true" || refreshParam === "yes";
+      refreshParam === "1" ||
+      refreshParam === "true" ||
+      refreshParam === "yes";
 
     const meta: IaEngineMeta = await getIaEngineMetaCached({
       forceRefresh,
@@ -39,4 +42,10 @@ emailV2MetaRouter.get(["/meta", "/"], async (req, res, next) => {
     console.error("🔥 Error obteniendo meta Email V2 desde IA Engine:", err);
     next(err);
   }
-});
+}
+
+// Rutas soportadas:
+// - /api/email-v2/meta
+// - /api/email-v2/meta2
+// - /api/email-v2
+emailV2MetaRouter.get(["/meta", "/meta2", "/"], handleMeta);

@@ -81,11 +81,15 @@ app.use("/api/history", historyRouter);
 
 // Meta Email 2.0 (campañas / clusters) – ruta principal usada por el frontend:
 // GET /api/email-v2/meta
+// GET /api/email-v2/meta2
+// GET /api/email-v2
 app.use("/api/email-v2", emailV2MetaRouter);
 
-// Alias plural para compatibilidad futura:
+// Alias plural para compatibilidad:
 // GET /api/emails-v2/meta
-app.use("/api/emails-v2/meta", metaEmailV2Router);
+// GET /api/emails-v2/meta2
+// GET /api/emails-v2/
+app.use("/api/emails-v2", metaEmailV2Router);
 
 // Generación de Email 2.0 (texto + imágenes) y edición:
 // POST /api/generate-emails-v2
@@ -142,3 +146,5 @@ app.listen(port, () => {
   console.log(`✅ email-studio backend escuchando en puerto ${port}`);
   console.log(`   NODE_ENV=${process.env.NODE_ENV || "undefined"}`);
 });
+
+export default app;
