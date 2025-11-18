@@ -1,9 +1,10 @@
 // backend/src/server.ts
+
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 
-// 👉 Router de historial (ya lo tienes implementado)
 import { historyRouter } from "./routes/history";
+import { CFG } from "./services/gcpStorage";
 
 // ======================================================
 // 1. Config básica de app
@@ -15,10 +16,7 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // CORS
-// - En dev: origin true (lo que sea)
-// - En prod: idealmente restringir a tu dominio de frontend
-//   ej: CORS_ORIGINS="https://frontendvo06-151554496273.europe-west1.run.app"
-const allowedOriginsEnv = process.env.CORS_ORIGINS;
+const allowedOriginsEnv = process.env.CORS_ORIGINS; // ej: "https://frontendvo06-....run.app"
 const allowedOrigins = allowedOriginsEnv
   ? allowedOriginsEnv.split(",").map((s) => s.trim())
   : true;
@@ -31,7 +29,7 @@ app.use(
 );
 
 // ======================================================
-// 2. Health checks (para Cloud Run y pruebas locales)
+// 2. Health checks
 // ======================================================
 
 app.get("/", (_req: Request, res: Response) => {
@@ -46,8 +44,7 @@ app.get("/ready", (_req: Request, res: Response) => {
   res.json({ status: "ready" });
 });
 
-// 🔍 Endpoint de debug para ver variables de entorno
-// ⚠️ IMPORTANTE: esto es solo para pruebas, luego lo deberías borrar o proteger.
+// Debug de entorno (solo para pruebas, luego lo puedes borrar o proteger)
 app.get("/env-check", (_req: Request, res: Response) => {
   res.json({
     NODE_ENV: process.env.NODE_ENV,
@@ -56,28 +53,21 @@ app.get("/env-check", (_req: Request, res: Response) => {
     GCP_BUCKET_NAME: process.env.GCP_BUCKET_NAME,
     GCP_PREFIX: process.env.GCP_PREFIX,
     GCP_PUBLIC_READ: process.env.GCP_PUBLIC_READ,
-    GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS || null,
+    CFG,
   });
 });
 
 // ======================================================
-// 3. Rutas de API (v1)
+// 3. Rutas de API
 // ======================================================
 
-// Historial de emails v2
-// El frontend está llamando: GET /api/history?type=emails_v2
 app.use("/api/history", historyRouter);
 
-// 👉 Más adelante agregaremos:
-// import { router as generateEmailV2Router } from "./routes/generateEmailV2";
-// app.use("/api/email-v2", generateEmailV2Router);
-// etc.
-
 // ======================================================
-// 4. Manejo de errores genérico
+// 4. Manejo de errores
 // ======================================================
 
-// 404
 app.use((req: Request, res: Response) => {
   res.status(404).json({
     error: "Not Found",
@@ -85,7 +75,6 @@ app.use((req: Request, res: Response) => {
   });
 });
 
-// 500 / errores no controlados
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error("🔥 Unhandled error in backend:", err);

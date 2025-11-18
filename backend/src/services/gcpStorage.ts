@@ -1,6 +1,5 @@
 // backend/src/services/gcpStorage.ts
-
-import "dotenv/config"; // En local lee .env; en Cloud Run es inocuo
+import "dotenv/config"; // En local lee .env; en Cloud Run no hace daño
 import fs from "fs";
 import path from "path";
 import { Storage, GetSignedUrlConfig } from "@google-cloud/storage";
@@ -28,8 +27,7 @@ function resolveKeyPath(p?: string | null): string | undefined {
 const keyPath = resolveKeyPath(GOOGLE_APPLICATION_CREDENTIALS);
 const hasKeyFile = keyPath && fs.existsSync(keyPath);
 
-// Antes tirabas error si el archivo no existía.
-// Ahora solo avisamos y dejamos que GCP use ADC (service account del servicio).
+// Si hay ruta pero no archivo → advertimos y dejamos que use ADC.
 if (keyPath && !hasKeyFile) {
   console.warn(
     `⚠️ GOOGLE_APPLICATION_CREDENTIALS apunta a ${keyPath}, ` +
@@ -38,7 +36,7 @@ if (keyPath && !hasKeyFile) {
 }
 
 // Opciones para Storage:
-// - En Cloud Run: normalmente basta con projectId (o ni eso).
+// - En Cloud Run: basta con projectId (o incluso vacío).
 // - En local: si definiste GOOGLE_APPLICATION_CREDENTIALS y existe, se usa ese json.
 const storageOptions: any = {};
 if (GCP_PROJECT_ID) storageOptions.projectId = GCP_PROJECT_ID;
@@ -46,8 +44,8 @@ if (hasKeyFile) storageOptions.keyFilename = keyPath;
 
 const storage = new Storage(storageOptions);
 
-// OJO: si no hay bucket configurado, no reventamos aquí.
-// Dejamos que las funciones que usan GCS validen y tiren error con mensaje decente.
+// Si no hay bucket configurado, no reventamos aquí.
+// Las funciones usarán ensureBucket() y tirarán un error claro.
 const bucket = GCP_BUCKET_NAME ? storage.bucket(GCP_BUCKET_NAME) : null;
 
 const isPublic = GCP_PUBLIC_READ === "true";
@@ -55,7 +53,7 @@ const urlStyle = ((GCP_URL_STYLE || "direct").toLowerCase() === "console"
   ? "console"
   : "direct") as "direct" | "console";
 
-/** Exportamos la config usada por las rutas (no revienta si falta bucket) */
+/** Config visible para otras partes del backend */
 export const CFG = {
   PROJECT_ID: GCP_PROJECT_ID || "",
   BUCKET: GCP_BUCKET_NAME || "",
@@ -133,27 +131,44 @@ export function detectContentTypeByExt(filename: string): string {
   const ext = path.extname(filename).toLowerCase();
   switch (ext) {
     // imágenes
-    case ".png": return "image/png";
+    case ".png":
+      return "image/png";
     case ".jpg":
-    case ".jpeg": return "image/jpeg";
-    case ".webp": return "image/webp";
-    case ".gif": return "image/gif";
-    case ".svg": return "image/svg+xml";
-    case ".avif": return "image/avif";
-    case ".ico": return "image/x-icon";
+    case ".jpeg":
+      return "image/jpeg";
+    case ".webp":
+      return "image/webp";
+    case ".gif":
+      return "image/gif";
+    case ".svg":
+      return "image/svg+xml";
+    case ".avif":
+      return "image/avif";
+    case ".ico":
+      return "image/x-icon";
     // texto / datos
-    case ".json": return "application/json";
-    case ".jsonl": return "application/x-ndjson";
-    case ".html": return "text/html; charset=utf-8";
-    case ".txt": return "text/plain; charset=utf-8";
-    case ".csv": return "text/csv; charset=utf-8";
-    case ".md": return "text/markdown; charset=utf-8";
+    case ".json":
+      return "application/json";
+    case ".jsonl":
+      return "application/x-ndjson";
+    case ".html":
+      return "text/html; charset=utf-8";
+    case ".txt":
+      return "text/plain; charset=utf-8";
+    case ".csv":
+      return "text/csv; charset=utf-8";
+    case ".md":
+      return "text/markdown; charset=utf-8";
     case ".yaml":
-    case ".yml": return "application/yaml";
+    case ".yml":
+      return "application/yaml";
     // binarios comunes
-    case ".pdf": return "application/pdf";
-    case ".zip": return "application/zip";
-    case ".mp4": return "video/mp4";
+    case ".pdf":
+      return "application/pdf";
+    case ".zip":
+      return "application/zip";
+    case ".mp4":
+      return "video/mp4";
     default:
       return "application/octet-stream";
   }

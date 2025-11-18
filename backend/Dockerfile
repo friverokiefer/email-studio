@@ -6,7 +6,7 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 
-# Instala deps (prod + dev) para poder compilar TypeScript
+# Instala deps (prod + dev) para compilar TypeScript
 COPY package*.json ./
 RUN npm ci
 
@@ -22,10 +22,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8080
 
-# Ruta que tu app espera para las credenciales de GCP
-ENV GOOGLE_APPLICATION_CREDENTIALS=/app/.secrets/service-account.json
-
-# Prepara carpeta para secretos y para assets generados en runtime
+# Prepara carpetas necesarias
 RUN mkdir -p /app/.secrets \
     && mkdir -p /app/dist/public/generated
 
@@ -36,11 +33,14 @@ RUN npm ci --omit=dev
 # Copia el build ya compilado
 COPY --from=build /app/dist ./dist
 
-# 🔑 Asegura que los estáticos de src/public existan en la imagen final
+# Copia estáticos si los hubiera
 COPY --from=build /app/src/public ./dist/public
 
 EXPOSE 8080
 
-# Las credenciales se montan en runtime, por ejemplo:
-#   -v "$PWD/.secrets:/app/.secrets:ro"
+# IMPORTANTE:
+# - NO seteamos GOOGLE_APPLICATION_CREDENTIALS aquí.
+# - En Cloud Run usaremos la service account del servicio (ADC).
+# - Si alguna vez quieres usar json en Docker local, montas el volumen
+#   y pasas GOOGLE_APPLICATION_CREDENTIALS al "docker run".
 CMD ["node", "dist/server.js"]
