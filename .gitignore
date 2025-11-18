@@ -45,6 +45,10 @@ Thumbs.db
 !.env.example
 !.env.*.example
 
+# EXCEPCIÓN: queremos versionar SOLO el .env.production del frontend
+# (no contiene secretos, solo URLs y nombres de bucket)
+!frontend/.env.production
+
 # Certificados y llaves globales
 *.pem
 *.p12
@@ -88,7 +92,6 @@ frontend/*.local
 # ========================================
 
 # Generados automáticamente (se pueden recrear con build)
-
 backend/tmp/
 
 
