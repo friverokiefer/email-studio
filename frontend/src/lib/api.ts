@@ -4,13 +4,13 @@
  * Configuración base de API
  *
  * - Dev (npm run dev):
- * API_BASE = ""  → el frontend llama a /api/... y Vite hace proxy al backend
- * (ver frontend/vite.config.ts)
+ *   API_BASE = ""  → el frontend llama a /api/... y Vite hace proxy al backend
+ *   (ver frontend/vite.config.ts)
  *
  * - Prod/Stage (build + Cloud Run):
- * API_BASE:
- * 1) Si VITE_API_BASE viene en el build → se usa esa.
- * 2) Si NO viene → fallback fijo al backend Cloud Run.
+ *   API_BASE:
+ *   1) Si VITE_API_BASE viene en el build → se usa esa.
+ *   2) Si NO viene → fallback fijo al backend Cloud Run.
  */
 
 const IS_DEV = (import.meta as any).env?.DEV as boolean;

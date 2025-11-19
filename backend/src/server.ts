@@ -24,22 +24,33 @@ const app = express();
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// CORS
+// ===================== CORS ==========================
 // CORS_ORIGINS puede ser:
-// - undefined  → permite cualquier origen (true)
+// - undefined  → permite cualquier origen (true)  [útil en pruebas]
 // - "https://front.run.app"  → un solo origen
 // - "https://front.run.app,https://otro.run.app" → varios
+//
+// En producción, lo ideal es setear CORS_ORIGINS en Cloud Run con
+// el dominio del frontend, por ejemplo:
+//   https://email-studio-frontend-151554496273.europe-west1.run.app
+// y, si quieres, también los orígenes de dev:
+//   http://localhost:5173,http://localhost:8081
+//
 const allowedOriginsEnv = process.env.CORS_ORIGINS;
-const allowedOrigins = allowedOriginsEnv
-  ? allowedOriginsEnv.split(",").map((s) => s.trim())
-  : true;
 
-app.use(
-  cors({
-    origin: allowedOrigins,
-    credentials: false,
-  })
-);
+const corsOptions = {
+  origin: allowedOriginsEnv
+    ? allowedOriginsEnv.split(",").map((s) => s.trim())
+    : true, // true = refleja cualquier origen (útil mientras afinamos)
+  credentials: false,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  optionsSuccessStatus: 204,
+};
+
+app.use(cors(corsOptions));
+// Preflight para TODAS las rutas. Necesario para POST/PUT con JSON desde el navegador.
+app.options("*", cors(corsOptions));
 
 // ======================================================
 // 2. Health checks
