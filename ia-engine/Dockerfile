@@ -1,21 +1,21 @@
 # =========================
 # ia-engine/Dockerfile
-# Motor de IA (FastAPI + Uvicorn)
+# Motor de IA (FastAPI + Uvicorn) para Cloud Run
 # =========================
 
 FROM python:3.11-slim AS base
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Instalar dependencias del sistema mínimas
+# Dependencias de sistema mínimas
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copiamos solo lo necesario para instalar deps primero (mejor cache)
+# Instalar dependencias de Python
 COPY requirements.txt ./
 
 RUN pip install --no-cache-dir --upgrade pip \
@@ -24,12 +24,14 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Copiamos el código de la app
 COPY app ./app
 
-# Puerto por defecto de FastAPI/Uvicorn
-EXPOSE 8000
+# Puerto que expone el contenedor (Cloud Run usará $PORT, típicamente 8080)
+ENV PORT=8080
+EXPOSE 8080
 
-# Variables de entorno típicas (ajustables en runtime)
-ENV OPENAI_API_KEY=""
-ENV ANTHROPIC_API_KEY=""
+# Variables de entorno típicas (se sobreescriben en Cloud Run)
+ENV OPENAI_API_KEY="" \
+    ANTHROPIC_API_KEY=""
 
 # Comando de arranque
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Usamos $PORT para que funcione tanto local como en Cloud Run
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}"]
