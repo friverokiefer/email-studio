@@ -179,10 +179,18 @@ export async function generateEmailsV2(
     feedback,
   };
 
-  return apiJson<GenerateV2Response>("/api/generate-emails-v2", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+  // ⬇️ AUMENTAMOS TIMEOUT SÓLO PARA LA GENERACIÓN (operación pesada)
+  return apiJson<GenerateV2Response>(
+    "/api/generate-emails-v2",
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+    {
+      // 4 minutos: da margen a 2–3 imágenes + varios sets, incluso en red lenta/VPN
+      timeoutMs: 240_000,
+    }
+  );
 }
 
 export async function updateEmailsV2(
