@@ -24,7 +24,9 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Copiamos el código de la app
 COPY app ./app
 
-# Puerto que expone el contenedor (Cloud Run usará $PORT, típicamente 8080)
+# Puerto que expone el contenedor
+# - Cloud Run inyecta $PORT (típicamente 8080)
+# - En local puedes overridear: docker run -e PORT=8000 ...
 ENV PORT=8080
 EXPOSE 8080
 
@@ -33,5 +35,5 @@ ENV OPENAI_API_KEY="" \
     ANTHROPIC_API_KEY=""
 
 # Comando de arranque
-# Usamos $PORT para que funcione tanto local como en Cloud Run
+# Usamos $PORT para que funcione tanto en Cloud Run como en local
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}"]
