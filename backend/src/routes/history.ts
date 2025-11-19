@@ -13,7 +13,7 @@ export const historyRouter = Router();
  * GET /api/history?type=emails_v2
  * Respuesta: [{ batchId, count, createdAt }]
  * Lee directamente desde GCS: emails_v2/<batchId>/batch.json
- * - count considera cantidad de sets de contenido (antes "trios") o imágenes del batch
+ * - count considera cantidad de sets de contenido o imágenes del batch
  */
 historyRouter.get("/", async (req, res) => {
   try {
@@ -35,21 +35,41 @@ historyRouter.get("/", async (req, res) => {
         if (exists) {
           try {
             const batch = await readJson<any>(batchKey);
-            const trios = Array.isArray(batch?.trios) ? batch.trios : [];
+
+            const sets = Array.isArray(batch?.sets) ? batch.sets : [];
+            // Compatibilidad con batches antiguos sin ensuciar la API pública
+            const legacyContent = Array.isArray((batch as any)["trios"])
+              ? (batch as any)["trios"]
+              : [];
             const images = Array.isArray(batch?.images) ? batch.images : [];
-            count = trios.length || images.length || 0;
+
+            // Prioridad: sets → contenido legacy → imágenes
+            count =
+              (sets.length > 0 ? sets.length : 0) ||
+              (legacyContent.length > 0 ? legacyContent.length : 0) ||
+              (images.length > 0 ? images.length : 0);
 
             if (batch?.createdAt) {
               const t = Date.parse(String(batch.createdAt));
-              createdAtMs = Number.isNaN(t) ? 0 : t;
+              if (!Number.isNaN(t)) {
+                createdAtMs = t;
+              }
             }
-          } catch {
+          } catch (err) {
+            console.error(`[history:list:GCS] error leyendo ${batchKey}:`, err);
             // Si falla el parse del JSON, seguimos sin romper toda la lista
           }
         }
 
         if (!createdAtMs) {
-          createdAtMs = await getObjectUpdatedAtMs(batchKey);
+          try {
+            createdAtMs = await getObjectUpdatedAtMs(batchKey);
+          } catch (err) {
+            console.error(
+              `[history:list:GCS] error getObjectUpdatedAtMs ${batchKey}:`,
+              err
+            );
+          }
         }
 
         return {
@@ -62,13 +82,18 @@ historyRouter.get("/", async (req, res) => {
       })
     );
 
-    rows.sort((a, b) => {
+    // Limpieza: sacamos filas sin contenido o sin fecha
+    const sanitized = rows.filter(
+      (row) => (row.count ?? 0) > 0 && !!row.createdAt
+    );
+
+    sanitized.sort((a, b) => {
       const ta = a.createdAt ? Date.parse(a.createdAt) : 0;
       const tb = b.createdAt ? Date.parse(b.createdAt) : 0;
       return tb - ta;
     });
 
-    res.json(rows);
+    res.json(sanitized);
   } catch (e: any) {
     console.error("[history:list:GCS] error:", e);
     res.status(500).send(e?.message || "ErrorHistoryList");

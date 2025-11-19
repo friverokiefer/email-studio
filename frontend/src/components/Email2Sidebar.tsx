@@ -603,12 +603,17 @@ export function Email2Sidebar({
         json = await hydrateFromManifest(parsedId, json);
       }
 
-      const setsFromJson =
-        Array.isArray(json.sets) && json.sets.length
-          ? json.sets
-          : Array.isArray(json.trios)
-          ? json.trios
-          : [];
+      const setsFromJson = (() => {
+        if (Array.isArray(json.sets) && json.sets.length > 0) {
+          return json.sets;
+        }
+        // Compatibilidad con contenido legacy sin exponer naming antiguo
+        const legacyContent = (json as any)["trios"];
+        if (Array.isArray(legacyContent) && legacyContent.length > 0) {
+          return legacyContent;
+        }
+        return [];
+      })();
 
       const resp: GenerateV2Response = {
         batchId: json.batchId || parsedId,
