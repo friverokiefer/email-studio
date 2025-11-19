@@ -13,23 +13,36 @@ import {
 
 const router = Router();
 
-/** Ubica el JSON real del batch (batch.json, _batch.json, manifest.json, etc.) */
+/**
+ * Ubica el JSON real del batch (batch.json, _batch.json, manifest.json, etc.)
+ * Busca SIEMPRE bajo emails_v2/<batchId>/...
+ * (gcpStorage se encarga de aplicar el PREFIX "dev/", etc.).
+ */
 async function resolveBatchJsonKey(batchId: string): Promise<string | null> {
-  const canonical = `emails_v2/${batchId}/batch.json`;
+  const basePrefix = `emails_v2/${batchId}/`;
+  const canonical = `${basePrefix}batch.json`;
+
   if (await objectExists(canonical)) return canonical;
 
-  const all = await listFilesByPrefix(`emails_v2/${batchId}/`);
+  const all = await listFilesByPrefix(basePrefix);
   const jsons = all
     .filter((f) => f.name.toLowerCase().endsWith(".json"))
     .map((f) => f.name);
 
   if (!jsons.length) return null;
 
-  const preferred = [/\/batch\.json$/i, /\/batch_v2\.json$/i, /\/_batch\.json$/i, /\/manifest\.json$/i];
+  const preferred = [
+    /\/batch\.json$/i,
+    /\/batch_v2\.json$/i,
+    /\/_batch\.json$/i,
+    /\/manifest\.json$/i,
+  ];
+
   for (const rx of preferred) {
     const hit = jsons.find((n) => rx.test(n));
     if (hit) return hit;
   }
+
   return jsons[0] || null;
 }
 
@@ -52,13 +65,19 @@ async function normalizeImages(batchId: string, data: any) {
       const fileName = String(img?.fileName || img?.url || "").replace(/^\/+/, "");
       if (!fileName) return img;
 
-      // Respetar si ya viene con http(s)
-      if (img?.heroUrl && /^https?:\/\//i.test(String(img.heroUrl))) return img;
+      // Si ya viene con http(s) la respetamos
+      if (img?.heroUrl && /^https?:\/\//i.test(String(img.heroUrl))) {
+        return img;
+      }
 
       const objectKey = `emails_v2/${batchId}/${fileName}`;
       try {
         const url = await heroUrlForObjectKey(objectKey);
-        return { ...img, heroUrl: url, consoleUrl: cloudConsoleUrl(objectKey) };
+        return {
+          ...img,
+          heroUrl: url,
+          consoleUrl: cloudConsoleUrl(objectKey),
+        };
       } catch {
         return img;
       }
@@ -75,12 +94,14 @@ async function getBatchJson(req: Request, res: Response) {
 
   try {
     const key = await resolveBatchJsonKey(batchId);
-    if (!key) return res.status(404).send(`No se encontró batch ${batchId}`);
+    if (!key) {
+      return res.status(404).send(`No se encontró batch ${batchId}`);
+    }
 
     const data = await readJson<any>(key);
     const fixed = await normalizeImages(batchId, data);
 
-    // Para que tengas un link “de vista” al JSON en cloud viewer (clic, no fetch):
+    // Link “de vista” al JSON en cloud viewer (para abrir en pestaña)
     (fixed as any)._viewerUrl = publicObjectUrl(key);
 
     return res.json(fixed);
@@ -89,19 +110,23 @@ async function getBatchJson(req: Request, res: Response) {
   }
 }
 
-/** Redirección universal de objetos (imágenes) */
+/** Redirección universal de objetos (imágenes, manifests, etc.) */
 async function redirectObject(req: Request, res: Response) {
   const batchId = String(req.params.batchId || "").trim();
   const file = String((req.params as any).file || "").replace(/^\/+/, "");
-  if (!batchId || !file) return res.status(400).send("batchId y archivo requeridos");
 
+  if (!batchId || !file) {
+    return res.status(400).send("batchId y archivo requeridos");
+  }
+
+  // withPrefix aplica "dev/" u otro prefijo
   const objectKey = withPrefix(`emails_v2/${batchId}/${file}`).replace(/^\/+/, "");
+
   try {
-    // Si público+console: usa viewer. Si no, firma o directa según ensureReadUrl.
     const url =
       CFG.PUBLIC_READ && CFG.URL_STYLE === "console"
-        ? publicObjectUrl(`emails_v2/${batchId}/${file}`)
-        : await ensureReadUrl(`emails_v2/${batchId}/${file}`, 10);
+        ? publicObjectUrl(objectKey)
+        : await ensureReadUrl(objectKey, 10);
 
     return res.redirect(302, url);
   } catch {
@@ -109,13 +134,27 @@ async function redirectObject(req: Request, res: Response) {
   }
 }
 
-// JSON
+/** ===== Rutas ===== */
+
+// JSON del batch
 router.get("/api/generated/emails_v2/:batchId/batch.json", getBatchJson);
 router.get("/generated/emails_v2/:batchId/batch.json", getBatchJson);
 
 // Archivos (wildcard)
-router.get("/api/generated/emails_v2/:batchId/*", (req, res) => redirectObject(req, res));
-router.get("/generated/emails_v2/:batchId/*", (req, res) => redirectObject(req, res));
+router.get("/api/generated/emails_v2/:batchId/*", (req, res) =>
+  redirectObject(req, res)
+);
+router.get("/generated/emails_v2/:batchId/*", (req, res) =>
+  redirectObject(req, res)
+);
+
+// Opcional: raíz sin batchId → 400 explícito (para evitar confusión)
+router.get("/api/generated/emails_v2", (_req, res) =>
+  res.status(400).send("batchId requerido")
+);
+router.get("/generated/emails_v2", (_req, res) =>
+  res.status(400).send("batchId requerido")
+);
 
 export const generatedRouter = router;
 export default router;

@@ -17,6 +17,7 @@ import { listHistory, type HistoryBatch } from "@/lib/history";
 import { loadFormState, saveFormState } from "@/lib/storage";
 import { toast } from "sonner";
 import { ConfirmGenerateModal } from "@/components/ui/ConfirmGenerateModal";
+import { API_BASE } from "@/lib/api"; // ⬅️ NUEVO: base del backend
 
 /* =========================
  * Tipos y estilos
@@ -576,13 +577,9 @@ export function Email2Sidebar({
     }
   }
 
-  /** Cargar lote directamente desde GCS (público) */
+  /** Cargar lote desde backend (principal) con fallback a GCS */
   async function handleLoadHistory(rawInput: string) {
     if (!rawInput) return;
-    if (!VITE_GCS_BUCKET) {
-      toast.error("Falta VITE_GCS_BUCKET en el frontend (.env).");
-      return;
-    }
 
     const parsedId = extractBatchId(rawInput) || rawInput.trim();
     if (!parsedId) {
@@ -590,12 +587,30 @@ export function Email2Sidebar({
       return;
     }
 
-    const url = `${gcsBatchJsonUrl(parsedId)}?t=${Date.now()}`;
     try {
-      const res = await fetch(url, { cache: "no-store" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // 1) Intentar backend: /api/generated/emails_v2/:batchId/batch.json
+      const base = API_BASE || "";
+      const backendUrl = `${base}/api/generated/emails_v2/${encodeURIComponent(
+        parsedId
+      )}/batch.json?t=${Date.now()}`;
+
+      let res = await fetch(backendUrl, { cache: "no-store" });
+
+      // 2) Si el backend no lo encuentra o hay error duro → fallback a GCS directo
+      if (!res.ok) {
+        if (!VITE_GCS_BUCKET) {
+          throw new Error(`Backend devolvió ${res.status}`);
+        }
+        const gcsUrl = `${gcsBatchJsonUrl(parsedId)}?t=${Date.now()}`;
+        res = await fetch(gcsUrl, { cache: "no-store" });
+        if (!res.ok) {
+          throw new Error(`GCS devolvió ${res.status}`);
+        }
+      }
+
       let json = await res.json();
 
+      // Si viniera directo de GCS sin heroUrl, normalizamos
       json = normalizeImagesFromGCS(json, parsedId);
 
       // Si las imágenes vienen vacías, intentamos hidratar desde el manifest
@@ -621,15 +636,18 @@ export function Email2Sidebar({
         sets: setsFromJson,
         images: json.images || [],
       };
+
       setActiveBatchId(resp.batchId);
       onGenerated?.(resp);
-      toast.success(`Lote ${resp.batchId} cargado desde GCS`);
+      toast.success(`Lote ${resp.batchId} cargado`);
 
       // Refrescamos historial (ej. si el conteo cambió)
       refreshHistory(true);
     } catch (err: any) {
-      toast.error(`No se pudo leer el lote desde GCS: ${err?.message || "Error"}`);
-      console.error("Load from GCS failed:", err);
+      toast.error(
+        `No se pudo leer el lote: ${err?.message || "Error cargando histórico"}`
+      );
+      console.error("Load history failed:", err);
     }
   }
 
@@ -698,7 +716,7 @@ export function Email2Sidebar({
                 target="_blank"
                 rel="noreferrer"
               >
-                batch.json
+                batch.json (GCS)
               </a>
             </>
           ) : null}
