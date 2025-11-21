@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { EmailV2Image, EmailContentSet } from "@/lib/apiEmailV2";
 import { EmailPreview } from "./EmailPreview";
+import { cn } from "@/lib/utils"; // Asumiendo que tienes un helper cn, si no, usa strings normales
 
 // 👇 re-export del tipo para que App.tsx pueda importarlo desde aquí
 export type { EmailContentSet } from "@/lib/apiEmailV2";
@@ -52,15 +53,17 @@ function absoluteHeroUrl(batchId: string, img: EmailV2Image): string {
   return url || current;
 }
 
-/** Normaliza un set (quita espacios, asegura body estructurado) */
+/** * Normaliza un set para asegurar estructura.
+ * ⚠️ CORRECCIÓN IMPORTANTE: Se eliminaron los .trim() para permitir espacios mientras se escribe.
+ */
 function normalizeSet(t: EmailContentSet): EmailContentSet {
   const body = (t?.body || {}) as Partial<EmailContentSet["body"]>;
   return {
     ...t,
-    subject: (t?.subject ?? "").trim(),
-    preheader: (t?.preheader ?? "").trim(),
+    subject: t?.subject ?? "",
+    preheader: t?.preheader ?? "",
     body: {
-      title: (body?.title ?? "").trim(),
+      title: body?.title ?? "",
       subtitle: (body?.subtitle ?? "") || null,
       content: body?.content ?? "",
     },
@@ -82,7 +85,7 @@ export function Email2Workspace({
   onEditedChange,
 }: {
   batchId: string;
-  trios: EmailContentSet[]; // prop legacy, concepto = sets de contenido
+  trios: EmailContentSet[];
   images: EmailV2Image[];
   showInternalPreview?: boolean;
   onPreviewChange?: (data: PreviewData | null) => void;
@@ -115,15 +118,20 @@ export function Email2Workspace({
   useEffect(() => {
     if (prevBatchRef.current !== batchId) return;
     const norm = normalizeSets(trios);
-    setEdited(norm);
+    // Solo actualizamos si hay cambios reales para evitar re-renders
+    if (JSON.stringify(norm) !== JSON.stringify(edited)) {
+        setEdited(norm);
+    }
+    
     setSelectedSet((prev) => {
       if (norm.length === 0) return null;
       if (prev == null) return 0;
       return prev >= norm.length ? norm.length - 1 : prev;
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trios, batchId]);
 
-  // Sincronizar imágenes cuando cambian desde el padre (mismo batch)
+  // Sincronizar imágenes
   useEffect(() => {
     if (prevBatchRef.current !== batchId) return;
     setSelectedImage((prev) => {
@@ -143,6 +151,7 @@ export function Email2Workspace({
     setEdited((prev) => {
       if (!prev[idx]) return prev;
       const next = [...prev];
+      // Aplicamos el patch sobre el objeto existente normalizado, sin trim() forzoso
       next[idx] = normalizeSet({ ...next[idx], ...patch });
       return next;
     });
@@ -166,7 +175,7 @@ export function Email2Workspace({
     el.style.height = `${el.scrollHeight}px`;
   }
 
-  // Preview calculada (set + imagen)
+  // Preview calculada
   const preview = useMemo<PreviewData | null>(() => {
     if (selectedSet == null || selectedImage == null) return null;
     const t = edited[selectedSet];
@@ -175,149 +184,155 @@ export function Email2Workspace({
     return {
       subject: t.subject,
       preheader: t.preheader,
-      title: (t.body?.title ?? "").trim(),
+      title: (t.body?.title ?? ""), // Sin trim aquí tampoco para ver espacios en vivo
       subtitle: t.body?.subtitle ?? null,
       content: t.body?.content ?? "",
       heroUrl: absoluteHeroUrl(batchId, img),
     };
   }, [edited, images, selectedSet, selectedImage, batchId]);
 
-  // Exponer preview al padre (App.tsx) para SFMC y panel derecho
+  // Exponer preview al padre
   useEffect(() => {
     onPreviewChange?.(preview);
   }, [preview, onPreviewChange]);
 
-  const textarea =
-    "w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500 resize-y leading-5";
+  // === ESTILOS REFACTORIZADOS ===
+  const labelStyle = "mb-1.5 block text-xs font-semibold text-slate-700 uppercase tracking-wide";
+  const inputBaseStyle = "w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 resize-y leading-relaxed hover:border-slate-300";
+  
   const cardStyle: React.CSSProperties = {
-    flex: "0 0 clamp(320px, 33.333%, 420px)",
+    flex: "0 0 clamp(340px, 40vw, 500px)", // Tarjetas un poco más anchas
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10 font-sans">
       {/* SETS */}
       <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-base font-semibold text-gray-800">
-            Sets de Contenido
-          </h3>
-          <p className="text-xs text-neutral-500">
-            Edita y selecciona 1 set + 1 imagen.
-          </p>
+        <div className="mb-5 flex items-end justify-between px-1">
+          <div>
+             <h3 className="text-lg font-bold text-slate-800 tracking-tight">
+                Sets de Contenido
+             </h3>
+             <p className="text-sm text-slate-500 mt-1">
+                Edita el texto del correo. Tus cambios se reflejan en tiempo real.
+             </p>
+          </div>
+          {edited.length > 0 && (
+             <div className="text-xs font-medium bg-slate-100 text-slate-600 px-2 py-1 rounded-md border border-slate-200">
+                {edited.length} Variantes
+             </div>
+          )}
         </div>
 
         {edited.length === 0 ? (
-          <div className="rounded-2xl border bg-white p-6 text-neutral-500">
-            Genera contenido en la izquierda (Email 2.0).
+          <div className="flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-10 text-center">
+             <div className="text-4xl mb-3">✍️</div>
+             <h4 className="text-slate-600 font-medium">Espacio de Trabajo vacío</h4>
+             <p className="text-slate-400 text-sm mt-1">Genera contenido desde el panel izquierdo para comenzar.</p>
           </div>
         ) : (
-          <div className="edge-fade-x flex gap-4 pb-2 overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth overscroll-contain">
+          <div className="group/track edge-fade-x -mx-1 px-1 flex gap-6 pb-6 overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth">
             {edited.map((t, idx) => {
               const active = selectedSet === idx;
               return (
                 <div
                   key={t.id ?? idx}
-                  className={
-                    "snap-start rounded-2xl border bg-white p-4 shadow-sm space-y-3 " +
-                    (active ? "ring-2 ring-sky-500" : "")
-                  }
+                  className={`
+                    snap-center relative flex flex-col rounded-2xl border transition-all duration-300
+                    ${active 
+                        ? "bg-white border-sky-500 shadow-lg ring-1 ring-sky-500/20 shadow-sky-100 z-10" 
+                        : "bg-white border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300 opacity-90 hover:opacity-100"
+                    }
+                  `}
                   style={cardStyle}
                 >
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name="setSel"
-                      checked={active}
-                      onChange={() => setSelectedSet(idx)}
-                    />
-                    <span className="text-xs font-medium text-neutral-600">
-                      Set #{idx + 1}
+                  {/* Header Tarjeta */}
+                  <div 
+                    className={`
+                        px-5 py-3 border-b flex items-center gap-3 cursor-pointer rounded-t-2xl transition-colors
+                        ${active ? "bg-sky-50/50 border-sky-100" : "bg-slate-50 border-slate-100 hover:bg-slate-100"}
+                    `}
+                    onClick={() => setSelectedSet(idx)}
+                  >
+                    <div className={`
+                        w-5 h-5 rounded-full border flex items-center justify-center transition-colors
+                        ${active ? "border-sky-500 bg-sky-500" : "border-slate-300 bg-white"}
+                    `}>
+                        {active && <div className="w-2 h-2 bg-white rounded-full" />}
+                    </div>
+                    <span className={`text-sm font-bold ${active ? "text-sky-700" : "text-slate-600"}`}>
+                      Opción {idx + 1}
                     </span>
                   </div>
 
-                  <div>
-                    <label className="mb-1 block text-[11px] font-medium">
-                      Subject
-                    </label>
-                    <textarea
-                      className={textarea}
-                      rows={1}
-                      onInput={autoResize}
-                      style={{ minHeight: 64, maxHeight: 200 }}
-                      value={t.subject}
-                      onChange={(e) =>
-                        updateSet(idx, { subject: e.target.value })
-                      }
-                      placeholder="Asunto del correo"
-                    />
-                  </div>
+                  {/* Cuerpo Tarjeta */}
+                  <div className="p-5 space-y-5 flex-1 overflow-y-auto custom-scrollbar max-h-[650px]">
+                    <div>
+                      <label className={labelStyle}>Subject</label>
+                      <textarea
+                        className={inputBaseStyle}
+                        rows={1}
+                        onInput={autoResize}
+                        style={{ minHeight: 54 }}
+                        value={t.subject}
+                        onChange={(e) => updateSet(idx, { subject: e.target.value })}
+                        placeholder="Escribe un asunto atractivo..."
+                      />
+                    </div>
 
-                  <div>
-                    <label className="mb-1 block text-[11px] font-medium">
-                      Pre-header
-                    </label>
-                    <textarea
-                      className={textarea}
-                      rows={1}
-                      onInput={autoResize}
-                      style={{ minHeight: 64, maxHeight: 200 }}
-                      value={t.preheader}
-                      onChange={(e) =>
-                        updateSet(idx, { preheader: e.target.value })
-                      }
-                      placeholder="Texto de vista previa"
-                    />
-                  </div>
+                    <div>
+                      <label className={labelStyle}>Pre-header</label>
+                      <textarea
+                        className={inputBaseStyle}
+                        rows={1}
+                        onInput={autoResize}
+                        style={{ minHeight: 54 }}
+                        value={t.preheader}
+                        onChange={(e) => updateSet(idx, { preheader: e.target.value })}
+                        placeholder="Texto visible en la bandeja de entrada..."
+                      />
+                    </div>
 
-                  <div>
-                    <label className="mb-1 block text-[11px] font-medium">
-                      Título
-                    </label>
-                    <textarea
-                      className={textarea}
-                      rows={1}
-                      onInput={autoResize}
-                      style={{ minHeight: 64, maxHeight: 200 }}
-                      value={t.body.title}
-                      onChange={(e) =>
-                        updateSetBody(idx, { title: e.target.value })
-                      }
-                      placeholder="Título del cuerpo"
-                    />
-                  </div>
+                    <div className="pt-2 border-t border-slate-100"></div>
 
-                  <div>
-                    <label className="mb-1 block text-[11px] font-medium">
-                      Bajada
-                    </label>
-                    <textarea
-                      className={textarea}
-                      rows={1}
-                      onInput={autoResize}
-                      style={{ minHeight: 64, maxHeight: 200 }}
-                      value={t.body.subtitle || ""}
-                      onChange={(e) =>
-                        updateSetBody(idx, { subtitle: e.target.value })
-                      }
-                      placeholder="Subtítulo del cuerpo"
-                    />
-                  </div>
+                    <div>
+                      <label className={labelStyle}>Título Principal</label>
+                      <textarea
+                        className={`${inputBaseStyle} font-semibold text-lg`}
+                        rows={1}
+                        onInput={autoResize}
+                        style={{ minHeight: 54 }}
+                        value={t.body.title}
+                        onChange={(e) => updateSetBody(idx, { title: e.target.value })}
+                        placeholder="El título principal del correo..."
+                      />
+                    </div>
 
-                  <div>
-                    <label className="mb-1 block text-[11px] font-medium">
-                      Contenido
-                    </label>
-                    <textarea
-                      className={textarea}
-                      rows={5}
-                      onInput={autoResize}
-                      style={{ minHeight: 390, maxHeight: 520 }}
-                      value={t.body.content}
-                      onChange={(e) =>
-                        updateSetBody(idx, { content: e.target.value })
-                      }
-                      placeholder="Contenido del cuerpo (texto libre)"
-                    />
+                    <div>
+                      <label className={labelStyle}>Bajada / Subtítulo</label>
+                      <textarea
+                        className={inputBaseStyle}
+                        rows={1}
+                        onInput={autoResize}
+                        style={{ minHeight: 54 }}
+                        value={t.body.subtitle || ""}
+                        onChange={(e) => updateSetBody(idx, { subtitle: e.target.value })}
+                        placeholder="Una frase corta complementaria..."
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelStyle}>Cuerpo del Mensaje</label>
+                      <textarea
+                        className={inputBaseStyle}
+                        rows={6}
+                        onInput={autoResize}
+                        style={{ minHeight: 200 }}
+                        value={t.body.content}
+                        onChange={(e) => updateSetBody(idx, { content: e.target.value })}
+                        placeholder="Escribe el contenido completo aquí..."
+                      />
+                    </div>
                   </div>
                 </div>
               );
@@ -328,17 +343,24 @@ export function Email2Workspace({
 
       {/* IMÁGENES */}
       <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-base font-semibold text-gray-800">Imágenes</h3>
-          <p className="text-xs text-neutral-500">Elige 1 imagen.</p>
+        <div className="mb-5 flex items-end justify-between px-1">
+             <div>
+                <h3 className="text-lg font-bold text-slate-800 tracking-tight">
+                    Galería de Imágenes
+                </h3>
+                <p className="text-sm text-slate-500 mt-1">
+                    Selecciona la imagen Hero para tu campaña.
+                </p>
+            </div>
         </div>
 
         {images.length === 0 ? (
-          <div className="rounded-2xl border bg-white p-6 text-neutral-500">
-            No hay imágenes generadas todavía.
+          <div className="flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-8 text-center">
+            <div className="text-4xl mb-3">🖼️</div>
+            <p className="text-slate-400 text-sm">Aún no se han generado imágenes.</p>
           </div>
         ) : (
-          <div className="edge-fade-x flex gap-4 pb-2 overflow-x-auto snap-x snap-mandatory scroll-smooth overscroll-contain">
+          <div className="flex gap-4 pb-4 overflow-x-auto snap-x snap-mandatory scroll-smooth">
             {images.map((img, idx) => {
               const active = selectedImage === idx;
               const hero = absoluteHeroUrl(batchId, img);
@@ -347,27 +369,35 @@ export function Email2Workspace({
                   key={img.fileName ?? idx}
                   type="button"
                   onClick={() => setSelectedImage(idx)}
-                  className={
-                    "snap-start group rounded-2xl border bg-white p-2 shadow-sm text-left transition " +
-                    (active ? "ring-2 ring-sky-500" : "hover:shadow-md")
-                  }
-                  style={cardStyle}
-                  title={`Seleccionar imagen #${idx + 1}`}
+                  className={`
+                    snap-start group relative flex-none w-[280px] rounded-2xl border transition-all duration-300 overflow-hidden text-left
+                    ${active 
+                        ? "ring-4 ring-sky-500/20 border-sky-500 shadow-lg scale-[1.02]" 
+                        : "border-slate-200 shadow-sm hover:shadow-md hover:border-sky-200 hover:-translate-y-1"
+                    }
+                  `}
                 >
-                  <div
-                    className="w-full overflow-hidden rounded-xl bg-neutral-100 flex items-center justify-center"
-                    style={{ aspectRatio: "16 / 9" }}
-                  >
+                  <div className="relative aspect-[16/10] bg-slate-100">
                     <img
                       src={hero}
                       alt={`Imagen ${idx + 1}`}
-                      className="w-full h-full object-contain"
+                      className="w-full h-full object-cover"
                       loading="lazy"
                     />
+                    {active && (
+                        <div className="absolute inset-0 bg-sky-900/10 flex items-center justify-center">
+                            <div className="bg-white/90 rounded-full p-2 shadow-sm">
+                                <svg className="w-5 h-5 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                            </div>
+                        </div>
+                    )}
                   </div>
-                  <div className="mt-2 text-xs text-neutral-600">
-                    {img.fileName}
-                    {img.meta?.size ? <span> • {img.meta.size}</span> : null}
+                  
+                  <div className={`px-3 py-2 text-xs border-t ${active ? "bg-sky-50 border-sky-100 text-sky-800" : "bg-white border-slate-100 text-slate-500"}`}>
+                     <span className="font-medium truncate block w-full">
+                        {img.fileName || `Imagen ${idx + 1}`}
+                     </span>
+                     {img.meta?.size && <span className="opacity-70 text-[10px]">{img.meta.size}</span>}
                   </div>
                 </button>
               );
@@ -376,17 +406,16 @@ export function Email2Workspace({
         )}
       </section>
 
-      {/* PREVIEW interno */}
+      {/* PREVIEW interno (Opcional, si showInternalPreview=true) */}
       {showInternalPreview && (
-        <section id="preview-email-v2">
-          <h3 className="mb-3 text-base font-semibold text-gray-800">
-            Vista previa
+        <section className="mt-10 pt-10 border-t border-slate-200">
+          <h3 className="mb-5 text-lg font-bold text-slate-800">
+            Previsualización
           </h3>
 
           {!preview ? (
-            <div className="rounded-2xl border bg-white p-6 text-neutral-500">
-              Selecciona un set de contenido y una imagen para ver la vista
-              previa.
+            <div className="p-6 bg-slate-50 rounded-xl text-slate-500 text-sm text-center border border-slate-200">
+              Faltan datos para generar la vista previa.
             </div>
           ) : (
             <EmailPreview
