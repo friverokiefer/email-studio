@@ -2,7 +2,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { EmailV2Image, EmailContentSet } from "@/lib/apiEmailV2";
 import { EmailPreview } from "./EmailPreview";
-import { cn } from "@/lib/utils"; // Asumiendo que tienes un helper cn, si no, usa strings normales
 
 // 👇 re-export del tipo para que App.tsx pueda importarlo desde aquí
 export type { EmailContentSet } from "@/lib/apiEmailV2";
@@ -54,7 +53,7 @@ function absoluteHeroUrl(batchId: string, img: EmailV2Image): string {
 }
 
 /** * Normaliza un set para asegurar estructura.
- * ⚠️ CORRECCIÓN IMPORTANTE: Se eliminaron los .trim() para permitir espacios mientras se escribe.
+ * SIN TRIMS para permitir espacios durante la edición.
  */
 function normalizeSet(t: EmailContentSet): EmailContentSet {
   const body = (t?.body || {}) as Partial<EmailContentSet["body"]>;
@@ -91,9 +90,11 @@ export function Email2Workspace({
   onPreviewChange?: (data: PreviewData | null) => void;
   onEditedChange?: (sets: EmailContentSet[]) => void;
 }) {
+  // Inicializamos estado local con props, pero permitimos divergencia
   const [edited, setEdited] = useState<EmailContentSet[]>(() =>
     normalizeSets(trios)
   );
+  
   const [selectedSet, setSelectedSet] = useState<number | null>(
     (trios || []).length ? 0 : null
   );
@@ -103,7 +104,7 @@ export function Email2Workspace({
 
   const prevBatchRef = useRef<string | null>(null);
 
-  // Reset completo cuando cambia el batchId
+  // 1. Reset completo cuando cambia el batchId (Nueva generación)
   useEffect(() => {
     if (prevBatchRef.current !== batchId) {
       prevBatchRef.current = batchId;
@@ -114,24 +115,19 @@ export function Email2Workspace({
     }
   }, [batchId, trios, images]);
 
-  // Sincronizar sets cuando cambian desde el padre (mismo batch)
+  // 2. Sincronización Estricta: Solo actualizamos si `trios` cambia de referencia.
+  // Eliminamos la comparación JSON.stringify que causaba el bug del "trim" automático.
   useEffect(() => {
     if (prevBatchRef.current !== batchId) return;
-    const norm = normalizeSets(trios);
-    // Solo actualizamos si hay cambios reales para evitar re-renders
-    if (JSON.stringify(norm) !== JSON.stringify(edited)) {
-        setEdited(norm);
-    }
     
-    setSelectedSet((prev) => {
-      if (norm.length === 0) return null;
-      if (prev == null) return 0;
-      return prev >= norm.length ? norm.length - 1 : prev;
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Solo si trios tiene contenido, actualizamos la base local.
+    // Esto respeta las ediciones del usuario hasta que el padre mande data nueva explícita.
+    if (trios && trios.length > 0) {
+       setEdited(normalizeSets(trios));
+    }
   }, [trios, batchId]);
 
-  // Sincronizar imágenes
+  // Sincronizar selección de imágenes
   useEffect(() => {
     if (prevBatchRef.current !== batchId) return;
     setSelectedImage((prev) => {
@@ -151,7 +147,6 @@ export function Email2Workspace({
     setEdited((prev) => {
       if (!prev[idx]) return prev;
       const next = [...prev];
-      // Aplicamos el patch sobre el objeto existente normalizado, sin trim() forzoso
       next[idx] = normalizeSet({ ...next[idx], ...patch });
       return next;
     });
@@ -184,7 +179,7 @@ export function Email2Workspace({
     return {
       subject: t.subject,
       preheader: t.preheader,
-      title: (t.body?.title ?? ""), // Sin trim aquí tampoco para ver espacios en vivo
+      title: t.body?.title ?? "",
       subtitle: t.body?.subtitle ?? null,
       content: t.body?.content ?? "",
       heroUrl: absoluteHeroUrl(batchId, img),
@@ -196,12 +191,12 @@ export function Email2Workspace({
     onPreviewChange?.(preview);
   }, [preview, onPreviewChange]);
 
-  // === ESTILOS REFACTORIZADOS ===
+  // === ESTILOS ===
   const labelStyle = "mb-1.5 block text-xs font-semibold text-slate-700 uppercase tracking-wide";
   const inputBaseStyle = "w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 resize-y leading-relaxed hover:border-slate-300";
   
   const cardStyle: React.CSSProperties = {
-    flex: "0 0 clamp(340px, 40vw, 500px)", // Tarjetas un poco más anchas
+    flex: "0 0 clamp(340px, 40vw, 500px)",
   };
 
   return (
@@ -274,7 +269,7 @@ export function Email2Workspace({
                         rows={1}
                         onInput={autoResize}
                         style={{ minHeight: 54 }}
-                        value={t.subject}
+                        value={t.subject || ""}
                         onChange={(e) => updateSet(idx, { subject: e.target.value })}
                         placeholder="Escribe un asunto atractivo..."
                       />
@@ -287,7 +282,7 @@ export function Email2Workspace({
                         rows={1}
                         onInput={autoResize}
                         style={{ minHeight: 54 }}
-                        value={t.preheader}
+                        value={t.preheader || ""}
                         onChange={(e) => updateSet(idx, { preheader: e.target.value })}
                         placeholder="Texto visible en la bandeja de entrada..."
                       />
@@ -302,7 +297,7 @@ export function Email2Workspace({
                         rows={1}
                         onInput={autoResize}
                         style={{ minHeight: 54 }}
-                        value={t.body.title}
+                        value={t.body.title || ""}
                         onChange={(e) => updateSetBody(idx, { title: e.target.value })}
                         placeholder="El título principal del correo..."
                       />
@@ -328,7 +323,7 @@ export function Email2Workspace({
                         rows={6}
                         onInput={autoResize}
                         style={{ minHeight: 200 }}
-                        value={t.body.content}
+                        value={t.body.content || ""}
                         onChange={(e) => updateSetBody(idx, { content: e.target.value })}
                         placeholder="Escribe el contenido completo aquí..."
                       />
