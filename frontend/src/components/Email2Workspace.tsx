@@ -90,7 +90,7 @@ export function Email2Workspace({
   onPreviewChange?: (data: PreviewData | null) => void;
   onEditedChange?: (sets: EmailContentSet[]) => void;
 }) {
-  // Inicializamos estado local con props, pero permitimos divergencia
+  // Inicializamos estado local con props
   const [edited, setEdited] = useState<EmailContentSet[]>(() =>
     normalizeSets(trios)
   );
@@ -104,9 +104,10 @@ export function Email2Workspace({
 
   const prevBatchRef = useRef<string | null>(null);
 
-  // 1. Reset completo cuando cambia el batchId (Nueva generación)
+  // 1. Reset completo SOLO cuando cambia el batchId (Nueva generación o cambio de proyecto)
   useEffect(() => {
     if (prevBatchRef.current !== batchId) {
+      console.log("🔄 Cambio de Batch ID detectado. Reseteando Workspace.");
       prevBatchRef.current = batchId;
       const norm = normalizeSets(trios);
       setEdited(norm);
@@ -115,19 +116,20 @@ export function Email2Workspace({
     }
   }, [batchId, trios, images]);
 
-  // 2. Sincronización Estricta: Solo actualizamos si `trios` cambia de referencia.
-  // Eliminamos la comparación JSON.stringify que causaba el bug del "trim" automático.
+  // 2. ⚠️ COMENTADO/ELIMINADO: Sincronización agresiva.
+  // Este efecto era el culpable. Cada vez que App.tsx hacía un re-render (aunque fuera invisible),
+  // volvía a pasar 'trios' y este efecto borraba tus cambios locales.
+  /*
   useEffect(() => {
     if (prevBatchRef.current !== batchId) return;
-    
-    // Solo si trios tiene contenido, actualizamos la base local.
-    // Esto respeta las ediciones del usuario hasta que el padre mande data nueva explícita.
     if (trios && trios.length > 0) {
-       setEdited(normalizeSets(trios));
+       // console.log("⚠️ Reset peligroso disparado por re-render del padre");
+       // setEdited(normalizeSets(trios)); 
     }
   }, [trios, batchId]);
+  */
 
-  // Sincronizar selección de imágenes
+  // Sincronizar selección de imágenes (esto es seguro mantenerlo)
   useEffect(() => {
     if (prevBatchRef.current !== batchId) return;
     setSelectedImage((prev) => {
@@ -144,6 +146,7 @@ export function Email2Workspace({
   }, [edited, onEditedChange]);
 
   function updateSet(idx: number, patch: Partial<EmailContentSet>) {
+    // console.log("Escribiendo en campo...", patch); // DEBUG
     setEdited((prev) => {
       if (!prev[idx]) return prev;
       const next = [...prev];
