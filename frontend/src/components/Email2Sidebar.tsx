@@ -91,7 +91,7 @@ export function Email2Sidebar({ onGenerated, currentBatchId }: { onGenerated?: (
 
   useEffect(() => { refreshHistory(true); }, [refreshHistory]);
 
-  // Catch-up history (polling breve tras generar para asegurar que aparezca en la lista)
+  // Catch-up history (polling breve tras generar)
   const catchUpHistoryFor = useCallback((targetBatchId: string) => {
     const delays = [700, 1500, 3500];
     const run = async () => {
@@ -120,8 +120,10 @@ export function Email2Sidebar({ onGenerated, currentBatchId }: { onGenerated?: (
   async function handleConfirmGenerate() {
     setConfirmOpen(false);
     setIsGenerating(true);
-    const start = Date.now();
-    setStartedAt(start);
+    
+    // Definimos la variable aquí para evitar errores de scope con TS
+    const startTime = Date.now();
+    setStartedAt(startTime);
     setElapsed(0);
 
     try {
@@ -141,15 +143,17 @@ export function Email2Sidebar({ onGenerated, currentBatchId }: { onGenerated?: (
       setActiveBatchId(resp.batchId);
       onGenerated?.(resp);
       
-      // Optimistic Update en la lista
+      // Optimistic Update
       setHistory(prev => [{ batchId: resp.batchId, count: (resp.images?.length || 0) } as HistoryBatch, ...prev]);
       catchUpHistoryFor(resp.batchId);
       
-      toast.success(`Lote ${resp.batchId} generado en ${formatDuration(Date.now() - start)}`);
+      toast.success(`Lote ${resp.batchId} generado en ${formatDuration(Date.now() - startTime)}`);
     } catch (e: any) {
       toast.error(e?.message || "Error al generar.");
     } finally {
       setIsGenerating(false);
+      // Ajuste final del tiempo
+      setElapsed((prev) => (prev === 0 ? Date.now() - startTime : prev));
     }
   }
 
@@ -160,7 +164,7 @@ export function Email2Sidebar({ onGenerated, currentBatchId }: { onGenerated?: (
 
     const toastId = toast.loading("Cargando lote...");
     try {
-      // Usamos el loader extraído en historyLoader.ts
+      // Usamos el loader refactorizado
       const resp = await loadHistoryBatch(bid); 
       setActiveBatchId(resp.batchId);
       onGenerated?.(resp);
@@ -190,7 +194,7 @@ export function Email2Sidebar({ onGenerated, currentBatchId }: { onGenerated?: (
         </div>
       </div>
 
-      {/* Info del lote activo */}
+      {/* Info Batch Activo */}
       {activeBatchId && (
         <div className="mx-1 px-3 py-2 bg-slate-100 rounded-lg text-xs text-slate-600 flex justify-between items-center">
             <span className="font-mono truncate max-w-[180px]">{activeBatchId}</span>
@@ -316,18 +320,39 @@ export function Email2Sidebar({ onGenerated, currentBatchId }: { onGenerated?: (
         </div>
       </Collapsible>
 
-      {/* Footer Action (Sticky) */}
-      <div className="sticky bottom-0 pt-4 bg-gradient-to-t from-white via-white to-transparent pb-2">
+      {/* ====== Footer Sticky Original ====== */}
+      <div
+        className="
+          sticky bottom-0 -mx-4 sm:-mx-0 px-4 sm:px-0 py-4
+          bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/70
+          border-t rounded-b-2xl
+        "
+      >
         <button
-            onClick={handlePreGenerate}
-            disabled={isGenerating || metaLoading}
-            className={`
-                w-full py-4 rounded-xl text-white font-bold text-lg shadow-lg shadow-sky-200 transition-all transform active:scale-95
-                ${isGenerating ? "bg-slate-400 cursor-not-allowed" : "bg-gradient-to-r from-sky-500 to-blue-600 hover:shadow-sky-300 hover:-translate-y-1"}
-            `}
+          onClick={handlePreGenerate}
+          disabled={isGenerating || metaLoading}
+          className={`
+            w-full rounded-2xl px-6 py-4 text-base md:text-lg font-semibold text-white shadow-sm transition
+            ${
+              isGenerating || metaLoading
+                ? "bg-sky-400 cursor-wait"
+                : "bg-sky-600 hover:bg-sky-700 active:scale-[0.99]"
+            }
+          `}
         >
-            {isGenerating ? "Generando..." : "✨ Generar Contenido"}
+          {isGenerating
+            ? "Generando…"
+            : metaLoading
+            ? "Cargando catálogo…"
+            : "Generar"}
         </button>
+
+        {/* Barra de carga animada original */}
+        {isGenerating && (
+          <div className="mt-3 w-full h-1.5 overflow-hidden rounded bg-neutral-200">
+            <div className="h-full w-1/3 animate-[loading_1.4s_ease-in-out_infinite] rounded bg-sky-500" />
+          </div>
+        )}
       </div>
 
       {/* Modal Confirmación */}
@@ -343,6 +368,15 @@ export function Email2Sidebar({ onGenerated, currentBatchId }: { onGenerated?: (
           images: state.imageCount,
         }}
       />
+
+      {/* Estilo inline para la animación */}
+      <style>{`
+        @keyframes loading {
+          0% { transform: translateX(-120%); }
+          50% { transform: translateX(40%); }
+          100% { transform: translateX(120%); }
+        }
+      `}</style>
     </div>
   );
 }
