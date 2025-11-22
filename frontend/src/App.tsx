@@ -1,47 +1,35 @@
-// frontend/src/App.tsx
 import React, { useState } from "react";
 import "./styles/index.css";
 import { toast } from "sonner";
 
-// Hooks (Lógica de Negocio)
 import { useEmailBatchState } from "@/hooks/useEmailBatchState";
 import { useSfmcDraftSender } from "@/hooks/useSfmcDraftSender";
 
-// Componentes de Layout
 import { Email2Sidebar } from "@/components/Email2Sidebar";
 import { Email2Workspace } from "@/components/Email2Workspace";
 import { PreviewPanel } from "@/components/PreviewPanel";
 import { ConfirmSendModal } from "@/components/ui/ConfirmSendModal";
 
 export default function App() {
-  // 1. Estado Principal del Batch (Sets, Imagenes, Guardado)
   const batchState = useEmailBatchState();
-  
-  // 2. Lógica de Envío a Salesforce
   const sfmcSender = useSfmcDraftSender();
-  
-  // 3. Estado local solo para UI (Modales)
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  // -- Handlers de UI --
-  
   const handleUploadClick = () => {
     if (!batchState.batchId || !batchState.livePreview) {
-      toast.warning("Selecciona un set de contenido y una imagen para enviar a SFMC.");
+      toast.warning("Selecciona un set y una imagen para enviar.");
       return;
     }
     setConfirmOpen(true);
   };
 
   const handleConfirmSend = async () => {
-    // a. Primero guardamos ediciones en backend
     try {
       await batchState.saveEdits();
     } catch {
-      return; // Si falla guardar, no enviamos
+      return;
     }
 
-    // b. Luego enviamos a SFMC usando el hook dedicado
     const success = await sfmcSender.sendToSfmc({
       batchId: batchState.batchId,
       livePreview: batchState.livePreview,
@@ -50,67 +38,81 @@ export default function App() {
       editedRef: batchState.editedRef,
     });
 
-    if (success) {
-      setConfirmOpen(false);
-    }
+    if (success) setConfirmOpen(false);
   };
 
-  const fileNameHint = batchState.batchId 
-    ? `sfmc_draft_${batchState.batchId}.json` 
+  const fileNameHint = batchState.batchId
+    ? `sfmc_draft_${batchState.batchId}.json`
     : undefined;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
+    <div className="h-screen w-full bg-slate-50 overflow-hidden flex flex-col font-sans text-slate-900">
+      {/* GRID: 420px | Auto | 540px */}
       <main
         className="
-          mx-auto max-w-[1880px] px-3 md:px-5 lg:px-7 xl:pl-3 xl:pr-6 2xl:pl-4 2xl:pr-8
-          grid gap-6 grid-cols-1
-          xl:grid-cols-[380px_minmax(820px,1fr)_480px]
-          2xl:grid-cols-[420px_minmax(980px,1fr)_560px]
+          flex-1 min-h-0
+          grid grid-cols-1
+          lg:grid-cols-[420px_minmax(0,1fr)]
+          xl:grid-cols-[420px_minmax(0,1fr)_540px]
+          grid-rows-[minmax(0,1fr)]
+          divide-x divide-slate-200
         "
-        style={{ alignItems: "start" }}
       >
-        {/* Columna 1: Sidebar (Input IA) */}
-        <aside className="order-1 xl:order-none bg-white rounded-2xl border shadow-sm p-4 md:p-5 sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-auto overscroll-contain">
-          <Email2Sidebar
-            onGenerated={batchState.handleGenerated}
-            currentBatchId={batchState.batchId}
-          />
+        {/* COL 1: SIDEBAR (Izquierda) */}
+        {/* 'pb-40' para asegurar que al expandir todo se pueda llegar al final con scroll */}
+        <aside className="hidden lg:block h-full min-h-0 overflow-y-auto bg-white custom-scrollbar relative z-10">
+          <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border-b border-slate-100 px-6 py-4 flex items-center justify-between shadow-sm">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+              <span className="text-lg">⚙️</span> Configuración
+            </h2>
+          </div>
+
+          <div className="p-6 pb-40">
+            <Email2Sidebar
+              onGenerated={batchState.handleGenerated}
+              currentBatchId={batchState.batchId}
+            />
+          </div>
         </aside>
 
-        {/* Columna 2: Workspace (Edición) */}
-        <section className="p-1 md:p-2 lg:p-3 min-h-[calc(100vh-2rem)] overflow-auto overscroll-contain">
-          <Email2Workspace
-            batchId={batchState.batchId}
-            trios={batchState.contentSets}
-            images={batchState.images}
-            showInternalPreview={false}
-            onPreviewChange={batchState.setLivePreview}
-            onEditedChange={batchState.handleEditedChange}
-          />
+        {/* COL 2: WORKSPACE (Centro) */}
+        <section className="h-full min-h-0 overflow-y-auto bg-slate-50/50 relative custom-scrollbar">
+          <div className="max-w-[1600px] mx-auto min-h-full flex flex-col">
+            <Email2Workspace
+              batchId={batchState.batchId}
+              trios={batchState.contentSets}
+              images={batchState.images}
+              showInternalPreview={false}
+              onPreviewChange={batchState.setLivePreview}
+              onEditedChange={batchState.handleEditedChange}
+            />
+            {/* Espacio de seguridad para scroll */}
+            <div className="h-32 shrink-0" />
+          </div>
         </section>
 
-        {/* Columna 3: Preview & Acciones */}
-        <PreviewPanel
-          livePreview={batchState.livePreview}
-          batchId={batchState.batchId}
-          isSaving={batchState.isSaving}
-          isUploading={sfmcSender.isUploading}
-          lastSavedAt={batchState.lastSavedAt}
-          savedVisible={batchState.savedVisible}
-          sfmcNotice={sfmcSender.sfmcNotice}
-          onSave={batchState.saveEdits}
-          onUploadClick={handleUploadClick}
-        />
+        {/* COL 3: PREVIEW (Derecha) */}
+        <div className="h-full min-h-0 overflow-y-auto bg-white custom-scrollbar">
+          <PreviewPanel
+            livePreview={batchState.livePreview}
+            batchId={batchState.batchId}
+            isSaving={batchState.isSaving}
+            isUploading={sfmcSender.isUploading}
+            lastSavedAt={batchState.lastSavedAt}
+            savedVisible={batchState.savedVisible}
+            sfmcNotice={sfmcSender.sfmcNotice}
+            onSave={batchState.saveEdits}
+            onUploadClick={handleUploadClick}
+          />
+        </div>
       </main>
 
-      {/* Modales */}
+      {/* Modal Global */}
       <ConfirmSendModal
         open={confirmOpen}
         busy={sfmcSender.isUploading}
         onClose={() => setConfirmOpen(false)}
         onConfirm={handleConfirmSend}
-        // Corrección: Mapeo explícito de tipos (content -> body)
         preview={
           batchState.livePreview
             ? {
@@ -118,7 +120,7 @@ export default function App() {
                 preheader: batchState.livePreview.preheader,
                 title: batchState.livePreview.title,
                 subtitle: batchState.livePreview.subtitle,
-                body: batchState.livePreview.content, // Aquí está el mapeo clave
+                body: batchState.livePreview.content,
                 heroUrl: batchState.livePreview.heroUrl,
               }
             : undefined
@@ -126,8 +128,6 @@ export default function App() {
         fileNameHint={fileNameHint}
         logoSrc="/salesforce2.png"
       />
-
-      <div className="h-6" />
     </div>
   );
 }

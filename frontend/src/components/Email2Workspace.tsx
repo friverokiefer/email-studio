@@ -1,9 +1,7 @@
-// frontend/src/components/Email2Workspace.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import type { EmailV2Image, EmailContentSet } from "@/lib/apiEmailV2";
 import { EmailPreview } from "./EmailPreview";
 
-// 👇 re-export del tipo para que App.tsx pueda importarlo desde aquí
 export type { EmailContentSet } from "@/lib/apiEmailV2";
 
 export type PreviewData = {
@@ -15,7 +13,7 @@ export type PreviewData = {
   heroUrl: string;
 };
 
-// === Config GCS para asegurar URLs absolutas ===
+// === Config GCS ===
 const VITE_GCS_BUCKET = (import.meta as any).env?.VITE_GCS_BUCKET || "";
 const VITE_GCS_PREFIX = (import.meta as any).env?.VITE_GCS_PREFIX || "dev";
 
@@ -39,7 +37,12 @@ function pathJoinAndEncode(...parts: (string | undefined | null)[]) {
 
 function gcsDirectObjectUrl(batchId: string, fileName: string) {
   if (!VITE_GCS_BUCKET) return null;
-  const path = pathJoinAndEncode(VITE_GCS_PREFIX, "emails_v2", batchId, fileName);
+  const path = pathJoinAndEncode(
+    VITE_GCS_PREFIX,
+    "emails_v2",
+    batchId,
+    fileName,
+  );
   return `https://storage.googleapis.com/${VITE_GCS_BUCKET}/${path}`;
 }
 
@@ -52,9 +55,6 @@ function absoluteHeroUrl(batchId: string, img: EmailV2Image): string {
   return url || current;
 }
 
-/** * Normaliza un set para asegurar estructura.
- * SIN TRIMS para permitir espacios durante la edición.
- */
 function normalizeSet(t: EmailContentSet): EmailContentSet {
   const body = (t?.body || {}) as Partial<EmailContentSet["body"]>;
   return {
@@ -74,7 +74,7 @@ function normalizeSets(arr: EmailContentSet[] | undefined | null): EmailContentS
   return arr.map((t) => normalizeSet(t));
 }
 
-/** === COMPONENTE ======================================================= */
+/** === COMPONENTE === */
 export function Email2Workspace({
   batchId,
   trios,
@@ -90,24 +90,15 @@ export function Email2Workspace({
   onPreviewChange?: (data: PreviewData | null) => void;
   onEditedChange?: (sets: EmailContentSet[]) => void;
 }) {
-  // Inicializamos estado local con props
-  const [edited, setEdited] = useState<EmailContentSet[]>(() =>
-    normalizeSets(trios)
-  );
-  
-  const [selectedSet, setSelectedSet] = useState<number | null>(
-    (trios || []).length ? 0 : null
-  );
-  const [selectedImage, setSelectedImage] = useState<number | null>(
-    images.length ? 0 : null
-  );
+  const [edited, setEdited] = useState<EmailContentSet[]>(() => normalizeSets(trios));
+  const [selectedSet, setSelectedSet] = useState<number | null>((trios || []).length ? 0 : null);
+  const [selectedImage, setSelectedImage] = useState<number | null>(images.length ? 0 : null);
 
   const prevBatchRef = useRef<string | null>(null);
 
-  // 1. Reset completo SOLO cuando cambia el batchId (Nueva generación o cambio de proyecto)
+  // Reset on batch change
   useEffect(() => {
     if (prevBatchRef.current !== batchId) {
-      console.log("🔄 Cambio de Batch ID detectado. Reseteando Workspace.");
       prevBatchRef.current = batchId;
       const norm = normalizeSets(trios);
       setEdited(norm);
@@ -116,20 +107,7 @@ export function Email2Workspace({
     }
   }, [batchId, trios, images]);
 
-  // 2. ⚠️ COMENTADO/ELIMINADO: Sincronización agresiva.
-  // Este efecto era el culpable. Cada vez que App.tsx hacía un re-render (aunque fuera invisible),
-  // volvía a pasar 'trios' y este efecto borraba tus cambios locales.
-  /*
-  useEffect(() => {
-    if (prevBatchRef.current !== batchId) return;
-    if (trios && trios.length > 0) {
-       // console.log("⚠️ Reset peligroso disparado por re-render del padre");
-       // setEdited(normalizeSets(trios)); 
-    }
-  }, [trios, batchId]);
-  */
-
-  // Sincronizar selección de imágenes (esto es seguro mantenerlo)
+  // Sync images
   useEffect(() => {
     if (prevBatchRef.current !== batchId) return;
     setSelectedImage((prev) => {
@@ -140,40 +118,35 @@ export function Email2Workspace({
     });
   }, [images, batchId]);
 
-  // Notificar ediciones al padre
+  // Notify parent
   useEffect(() => {
     onEditedChange?.(edited);
   }, [edited, onEditedChange]);
 
-  function updateSet(idx: number, patch: Partial<EmailContentSet>) {
-    // console.log("Escribiendo en campo...", patch); // DEBUG
+  // Updates
+  const updateSet = (idx: number, patch: Partial<EmailContentSet>) => {
     setEdited((prev) => {
-      if (!prev[idx]) return prev;
       const next = [...prev];
       next[idx] = normalizeSet({ ...next[idx], ...patch });
       return next;
     });
-  }
+  };
 
-  function updateSetBody(idx: number, patch: Partial<EmailContentSet["body"]>) {
+  const updateSetBody = (idx: number, patch: Partial<EmailContentSet["body"]>) => {
     setEdited((prev) => {
-      if (!prev[idx]) return prev;
       const next = [...prev];
-      next[idx] = normalizeSet({
-        ...next[idx],
-        body: { ...next[idx].body, ...patch },
-      });
+      next[idx] = normalizeSet({ ...next[idx], body: { ...next[idx].body, ...patch } });
       return next;
     });
-  }
+  };
 
-  function autoResize(e: React.FormEvent<HTMLTextAreaElement>) {
+  const autoResize = (e: React.FormEvent<HTMLTextAreaElement>) => {
     const el = e.currentTarget;
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
-  }
+  };
 
-  // Preview calculada
+  // Preview
   const preview = useMemo<PreviewData | null>(() => {
     if (selectedSet == null || selectedImage == null) return null;
     const t = edited[selectedSet];
@@ -189,233 +162,271 @@ export function Email2Workspace({
     };
   }, [edited, images, selectedSet, selectedImage, batchId]);
 
-  // Exponer preview al padre
   useEffect(() => {
     onPreviewChange?.(preview);
   }, [preview, onPreviewChange]);
 
-  // === ESTILOS ===
-  const labelStyle = "mb-1.5 block text-xs font-semibold text-slate-700 uppercase tracking-wide";
-  const inputBaseStyle = "w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 resize-y leading-relaxed hover:border-slate-300";
-  
-  const cardStyle: React.CSSProperties = {
-    flex: "0 0 clamp(340px, 40vw, 500px)",
-  };
+  // Compact styles
+  const labelStyle =
+    "mb-0.5 block text-[7px] font-medium text-slate-500 uppercase tracking-wider";
+  const inputBaseStyle =
+    "w-full rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 resize-y leading-relaxed hover:border-slate-300 shadow-sm";
 
   return (
-    <div className="space-y-10 font-sans">
-      {/* SETS */}
-      <section>
-        <div className="mb-5 flex items-end justify-between px-1">
-          <div>
-             <h3 className="text-lg font-bold text-slate-800 tracking-tight">
-                Sets de Contenido
-             </h3>
-             <p className="text-sm text-slate-500 mt-1">
-                Edita el texto del correo. Tus cambios se reflejan en tiempo real.
-             </p>
-          </div>
-          {edited.length > 0 && (
-             <div className="text-xs font-medium bg-slate-100 text-slate-600 px-2 py-1 rounded-md border border-slate-200">
-                {edited.length} Variantes
-             </div>
-          )}
-        </div>
+    <div className="flex h-full min-h-0 w-full flex-col">
+      <div className="mx-auto flex w-full max-w-[840px] flex-col px-3 lg:px-3.5 py-2 lg:py-3.5">
 
-        {edited.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-10 text-center">
-             <div className="text-4xl mb-3">✍️</div>
-             <h4 className="text-slate-600 font-medium">Espacio de Trabajo vacío</h4>
-             <p className="text-slate-400 text-sm mt-1">Genera contenido desde el panel izquierdo para comenzar.</p>
-          </div>
-        ) : (
-          <div className="group/track edge-fade-x -mx-1 px-1 flex gap-6 pb-6 overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth">
-            {edited.map((t, idx) => {
-              const active = selectedSet === idx;
-              return (
-                <div
-                  key={t.id ?? idx}
-                  className={`
-                    snap-center relative flex flex-col rounded-2xl border transition-all duration-300
-                    ${active 
-                        ? "bg-white border-sky-500 shadow-lg ring-1 ring-sky-500/20 shadow-sky-100 z-10" 
-                        : "bg-white border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300 opacity-90 hover:opacity-100"
-                    }
-                  `}
-                  style={cardStyle}
-                >
-                  {/* Header Tarjeta */}
-                  <div 
-                    className={`
-                        px-5 py-3 border-b flex items-center gap-3 cursor-pointer rounded-t-2xl transition-colors
-                        ${active ? "bg-sky-50/50 border-sky-100" : "bg-slate-50 border-slate-100 hover:bg-slate-100"}
-                    `}
-                    onClick={() => setSelectedSet(idx)}
-                  >
-                    <div className={`
-                        w-5 h-5 rounded-full border flex items-center justify-center transition-colors
-                        ${active ? "border-sky-500 bg-sky-500" : "border-slate-300 bg-white"}
-                    `}>
-                        {active && <div className="w-2 h-2 bg-white rounded-full" />}
-                    </div>
-                    <span className={`text-sm font-bold ${active ? "text-sky-700" : "text-slate-600"}`}>
-                      Opción {idx + 1}
-                    </span>
-                  </div>
-
-                  {/* Cuerpo Tarjeta */}
-                  <div className="p-5 space-y-5 flex-1 overflow-y-auto custom-scrollbar max-h-[650px]">
-                    <div>
-                      <label className={labelStyle}>Subject</label>
-                      <textarea
-                        className={inputBaseStyle}
-                        rows={1}
-                        onInput={autoResize}
-                        style={{ minHeight: 54 }}
-                        value={t.subject || ""}
-                        onChange={(e) => updateSet(idx, { subject: e.target.value })}
-                        placeholder="Escribe un asunto atractivo..."
-                      />
-                    </div>
-
-                    <div>
-                      <label className={labelStyle}>Pre-header</label>
-                      <textarea
-                        className={inputBaseStyle}
-                        rows={1}
-                        onInput={autoResize}
-                        style={{ minHeight: 54 }}
-                        value={t.preheader || ""}
-                        onChange={(e) => updateSet(idx, { preheader: e.target.value })}
-                        placeholder="Texto visible en la bandeja de entrada..."
-                      />
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-100"></div>
-
-                    <div>
-                      <label className={labelStyle}>Título Principal</label>
-                      <textarea
-                        className={`${inputBaseStyle} font-semibold text-lg`}
-                        rows={1}
-                        onInput={autoResize}
-                        style={{ minHeight: 54 }}
-                        value={t.body.title || ""}
-                        onChange={(e) => updateSetBody(idx, { title: e.target.value })}
-                        placeholder="El título principal del correo..."
-                      />
-                    </div>
-
-                    <div>
-                      <label className={labelStyle}>Bajada / Subtítulo</label>
-                      <textarea
-                        className={inputBaseStyle}
-                        rows={1}
-                        onInput={autoResize}
-                        style={{ minHeight: 54 }}
-                        value={t.body.subtitle || ""}
-                        onChange={(e) => updateSetBody(idx, { subtitle: e.target.value })}
-                        placeholder="Una frase corta complementaria..."
-                      />
-                    </div>
-
-                    <div>
-                      <label className={labelStyle}>Cuerpo del Mensaje</label>
-                      <textarea
-                        className={inputBaseStyle}
-                        rows={6}
-                        onInput={autoResize}
-                        style={{ minHeight: 200 }}
-                        value={t.body.content || ""}
-                        onChange={(e) => updateSetBody(idx, { content: e.target.value })}
-                        placeholder="Escribe el contenido completo aquí..."
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* IMÁGENES */}
-      <section>
-        <div className="mb-5 flex items-end justify-between px-1">
-             <div>
-                <h3 className="text-lg font-bold text-slate-800 tracking-tight">
-                    Galería de Imágenes
+        {/* SETS DE CONTENIDO */}
+        <section className="mb-3">
+          <div className="sticky top-0 z-30 -mx-3 lg:-mx-3.5 px-3 lg:px-3.5 py-1.5 bg-slate-50/95 backdrop-blur-md mb-2.5 border-b border-slate-200 shadow-sm flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-base">✍️</span>
+              <div>
+                <h3 className="text-[13px] font-semibold text-slate-800 tracking-tight">
+                  Editor de Texto
                 </h3>
-                <p className="text-sm text-slate-500 mt-1">
-                    Selecciona la imagen Hero para tu campaña.
-                </p>
+                <p className="text-[9px] text-slate-500">Selecciona y edita una variante.</p>
+              </div>
             </div>
-        </div>
-
-        {images.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-8 text-center">
-            <div className="text-4xl mb-3">🖼️</div>
-            <p className="text-slate-400 text-sm">Aún no se han generado imágenes.</p>
+            {edited.length > 0 && (
+              <div className="text-[9px] font-semibold bg-white text-slate-600 px-2 py-0.5 rounded-full border border-slate-200 shadow-sm">
+                {edited.length} variantes
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="flex gap-4 pb-4 overflow-x-auto snap-x snap-mandatory scroll-smooth">
-            {images.map((img, idx) => {
-              const active = selectedImage === idx;
-              const hero = absoluteHeroUrl(batchId, img);
-              return (
-                <button
-                  key={img.fileName ?? idx}
-                  type="button"
-                  onClick={() => setSelectedImage(idx)}
-                  className={`
-                    snap-start group relative flex-none w-[280px] rounded-2xl border transition-all duration-300 overflow-hidden text-left
-                    ${active 
-                        ? "ring-4 ring-sky-500/20 border-sky-500 shadow-lg scale-[1.02]" 
-                        : "border-slate-200 shadow-sm hover:shadow-md hover:border-sky-200 hover:-translate-y-1"
-                    }
-                  `}
-                >
-                  <div className="relative aspect-[16/10] bg-slate-100">
+
+          {edited.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-200 bg-white/50 p-5 text-center min-h-[180px]">
+              <div className="text-3xl mb-2 opacity-30">📝</div>
+              <h4 className="text-slate-500 font-medium text-xs">Esperando generación...</h4>
+            </div>
+          ) : (
+            <div className="group/track flex gap-2.5 pb-3 overflow-x-auto snap-x snap-mandatory scroll-smooth px-0.5">
+              {edited.map((t, idx) => {
+                const active = selectedSet === idx;
+
+                return (
+                  <div
+                    key={idx}
+                    className={`
+                      snap-start flex-none flex flex-col rounded-2xl border transition-all duration-300 bg-white
+                      ${
+                        active
+                          ? "border-sky-500 shadow-md shadow-sky-100/60 z-10 ring-1 ring-sky-500/20 scale-[1.01]"
+                          : "border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300"
+                      }
+                    `}
+                    style={{ width: "300px" }}
+                  >
+
+                    {/* HEADER */}
+                    <div
+                      className={`
+                        px-3 py-2 border-b flex items-center justify-between cursor-pointer rounded-t-2xl transition-colors
+                        ${
+                          active
+                            ? "bg-sky-50/40 border-sky-100"
+                            : "bg-white border-slate-50 hover:bg-slate-50"
+                        }
+                      `}
+                      onClick={() => setSelectedSet(idx)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`
+                            w-4 h-4 rounded-full border flex items-center justify-center
+                            ${
+                              active
+                                ? "border-sky-500 bg-sky-500 text-white"
+                                : "border-slate-300 bg-white text-transparent"
+                            }
+                          `}
+                        >
+                          <div className="w-1.5 h-1.5 bg-current rounded-full" />
+                        </div>
+                        <span
+                          className={`text-[10px] font-medium ${
+                            active ? "text-sky-700" : "text-slate-600"
+                          }`}
+                        >
+                          Opción {idx + 1}
+                        </span>
+                      </div>
+
+                      {active && (
+                        <span className="text-[8px] font-bold uppercase bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded tracking-wide">
+                          Editando
+                        </span>
+                      )}
+                    </div>
+
+                    {/* CAMPOS */}
+                    <div className="p-3 space-y-2.5 bg-slate-50/30 flex-1">
+
+                      {/* SUBJECT */}
+                      <div>
+                        <label className={labelStyle}>Asunto (Subject)</label>
+                        <textarea
+                          className={inputBaseStyle}
+                          rows={2}
+                          onInput={autoResize}
+                          style={{ minHeight: 48 }}
+                          value={t.subject || ""}
+                          onChange={(e) => updateSet(idx, { subject: e.target.value })}
+                        />
+                      </div>
+
+                      {/* PREHEADER */}
+                      <div>
+                        <label className={labelStyle}>Pre-header</label>
+                        <textarea
+                          className={inputBaseStyle}
+                          rows={2}
+                          onInput={autoResize}
+                          style={{ minHeight: 48 }}
+                          value={t.preheader || ""}
+                          onChange={(e) => updateSet(idx, { preheader: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="h-px bg-slate-200" />
+
+                      {/* TITLE */}
+                      <div>
+                        <label className={labelStyle}>Título principal</label>
+                        <textarea
+                          className={inputBaseStyle}
+                          rows={2}
+                          onInput={autoResize}
+                          style={{ minHeight: 48 }}
+                          value={t.body.title || ""}
+                          onChange={(e) => updateSetBody(idx, { title: e.target.value })}
+                        />
+                      </div>
+
+                      {/* SUBTITLE */}
+                      <div>
+                        <label className={labelStyle}>Bajada</label>
+                        <textarea
+                          className={inputBaseStyle}
+                          rows={5}
+                          onInput={autoResize}
+                          style={{ minHeight: 110 }}
+                          value={t.body.subtitle || ""}
+                          onChange={(e) => updateSetBody(idx, { subtitle: e.target.value })}
+                        />
+                      </div>
+
+                      {/* CONTENT — AHORA 15 LÍNEAS */}
+                      <div>
+                        <label className={labelStyle}>Cuerpo del mensaje</label>
+                        <textarea
+                          className={inputBaseStyle}
+                          rows={15}
+                          onInput={autoResize}
+                          style={{ minHeight: 275 }}  // ≈ 15 líneas
+                          value={t.body.content || ""}
+                          onChange={(e) => updateSetBody(idx, { content: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* IMÁGENES */}
+        <section className="pt-2 border-t border-slate-200 pb-8">
+          <div className="sticky top-0 z-20 -mx-3 lg:-mx-3.5 px-3 lg:px-3.5 py-1.5 bg-slate-50/95 backdrop-blur-md mb-2 border-b border-slate-200 shadow-sm flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-base">🖼️</span>
+              <div>
+                <h3 className="text-[13px] font-semibold text-slate-800 tracking-tight">
+                  Galería de Imágenes
+                </h3>
+                <p className="text-[9px] text-slate-500">Selecciona la imagen Hero.</p>
+              </div>
+            </div>
+            {images.length > 0 && (
+              <span className="text-[9px] text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-200 shadow-sm">
+                {images.length} opciones
+              </span>
+            )}
+          </div>
+
+          {images.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-200 bg-white/50 p-4 text-center h-28">
+              <div className="text-3xl mb-2 opacity-30">🖼️</div>
+              <p className="text-slate-400 text-xs">Sin imágenes aún.</p>
+            </div>
+          ) : (
+            <div className="flex gap-2.5 pb-2 overflow-x-auto snap-x snap-mandatory scroll-smooth px-0.5">
+              {images.map((img, idx) => {
+                const active = selectedImage === idx;
+                const hero = absoluteHeroUrl(batchId, img);
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setSelectedImage(idx)}
+                    className={`
+                      snap-start group relative flex-none rounded-2xl overflow-hidden border-2 transition-all duration-200 aspect-video bg-white shadow-sm text-left
+                      ${
+                        active
+                          ? "border-sky-500 ring-4 ring-sky-500/10 shadow-xl translate-y-[-2px]"
+                          : "border-transparent hover:border-slate-300 hover:shadow-md"
+                      }
+                    `}
+                    style={{ width: "300px" }}
+                  >
                     <img
                       src={hero}
                       alt={`Imagen ${idx + 1}`}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
-                    {active && (
-                        <div className="absolute inset-0 bg-sky-900/10 flex items-center justify-center">
-                            <div className="bg-white/90 rounded-full p-2 shadow-sm">
-                                <svg className="w-5 h-5 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                            </div>
-                        </div>
-                    )}
-                  </div>
-                  
-                  <div className={`px-3 py-2 text-xs border-t ${active ? "bg-sky-50 border-sky-100 text-sky-800" : "bg-white border-slate-100 text-slate-500"}`}>
-                     <span className="font-medium truncate block w-full">
-                        {img.fileName || `Imagen ${idx + 1}`}
-                     </span>
-                     {img.meta?.size && <span className="opacity-70 text-[10px]">{img.meta.size}</span>}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </section>
 
-      {/* PREVIEW interno (Opcional, si showInternalPreview=true) */}
-      {showInternalPreview && (
-        <section className="mt-10 pt-10 border-t border-slate-200">
-          <h3 className="mb-5 text-lg font-bold text-slate-800">
-            Previsualización
-          </h3>
+                    <div
+                      className={`absolute top-2 right-2 rounded-full p-1.5 transition-all duration-200 ${
+                        active
+                          ? "bg-sky-500 text-white scale-100 shadow-lg"
+                          : "bg-black/40 text-white/70 scale-90 hover:scale-100"
+                      }`}
+                    >
+                      {active ? (
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={3}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <div className="w-4 h-4 rounded-full border-2 border-current" />
+                      )}
+                    </div>
 
-          {!preview ? (
-            <div className="p-6 bg-slate-50 rounded-xl text-slate-500 text-sm text-center border border-slate-200">
-              Faltan datos para generar la vista previa.
+                    <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <p className="text-white text-[9px] font-medium truncate font-mono">
+                        {img.fileName}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-          ) : (
+          )}
+        </section>
+
+        {/* MOBILE PREVIEW */}
+        {showInternalPreview && preview && (
+          <section className="mt-3 pt-3 border-t border-slate-200 lg:hidden pb-8">
+            <h3 className="mb-2 text-sm font-semibold text-slate-800">
+              Previsualización móvil
+            </h3>
             <EmailPreview
               subject={preview.subject}
               preheader={preview.preheader}
@@ -424,9 +435,9 @@ export function Email2Workspace({
               body={preview.content}
               heroUrl={preview.heroUrl}
             />
-          )}
-        </section>
-      )}
+          </section>
+        )}
+      </div>
     </div>
   );
 }
