@@ -233,9 +233,15 @@ export async function generateHeroPNG({
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      console.log(`[image] attempt ${attempt}/${MAX_ATTEMPTS} model=${model} size=${size} quality=${quality}`);
+      console.log(
+        `[image] attempt ${attempt}/${MAX_ATTEMPTS} model=${model} size=${size} quality=${quality}`
+      );
       const params: any = { model, size, prompt, quality };
-      const res = await withTimeout(client.images.generate(params), PER_ATTEMPT_TIMEOUT, "images.generate");
+      const res = await withTimeout(
+        client.images.generate(params),
+        PER_ATTEMPT_TIMEOUT,
+        "images.generate"
+      );
       b64 = (res as any)?.data?.[0]?.b64_json;
       if (b64) break;
       lastErr = new Error("La API no retornó imagen (b64_json vacío).");
@@ -268,9 +274,18 @@ export async function generateHeroPNG({
   const rawBuffer = Buffer.from(b64, "base64");
   await writeBuffer(tmpPath, rawBuffer);
 
-  await sharp(tmpPath).rotate().toColourspace("srgb").jpeg({ quality: 90, mozjpeg: true }).toFile(rawPath);
+  await sharp(tmpPath)
+    .rotate()
+    .toColourspace("srgb")
+    .jpeg({ quality: 90, mozjpeg: true })
+    .toFile(rawPath);
 
-  await normalizeJpeg(tmpPath, finalPath, { mode, width: 1792, height: 1024, quality: 88 });
+  await normalizeJpeg(tmpPath, finalPath, {
+    mode,
+    width: 1792,
+    height: 1024,
+    quality: 88,
+  });
 
   try {
     await fs.unlink(tmpPath);
@@ -284,7 +299,14 @@ export async function generateHeroPNG({
     fileName: finalName,
     url: finalName,
     rawFileName: rawName,
-    meta: { model, size, width: realW, height: realH, quality, sizeNormalized: `${realW}x${realH}` },
+    meta: {
+      model,
+      size,
+      width: realW,
+      height: realH,
+      quality,
+      sizeNormalized: `${realW}x${realH}`,
+    },
   };
 }
 
@@ -307,7 +329,10 @@ export async function generateBannerJPG({
   const size: ImageSizeUnion = pickSizeForModel(model, "1536x1024");
   const quality: ImageQualityUnion = "low"; // ⚡ igual que arriba
 
-  const base = (fileName?.replace(/\.(jpg|jpeg|png|webp)$/i, "") || `banner_${Date.now()}`).trim();
+  const base = (
+    fileName?.replace(/\.(jpg|jpeg|png|webp)$/i, "") ||
+    `banner_${Date.now()}`
+  ).trim();
   const tmpPath = path.join(outDir, `${base}.tmp.jpg`);
   const rawName = `${base}.raw.jpg`;
   const rawPath = path.join(outDir, rawName);
@@ -322,9 +347,15 @@ export async function generateBannerJPG({
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      console.log(`[banner] attempt ${attempt}/${MAX_ATTEMPTS} model=${model} size=${size} quality=${quality}`);
+      console.log(
+        `[banner] attempt ${attempt}/${MAX_ATTEMPTS} model=${model} size=${size} quality=${quality}`
+      );
       const params: any = { model, size, prompt, quality };
-      const res = await withTimeout(client.images.generate(params), PER_ATTEMPT_TIMEOUT, "images.generate");
+      const res = await withTimeout(
+        client.images.generate(params),
+        PER_ATTEMPT_TIMEOUT,
+        "images.generate"
+      );
       b64 = (res as any)?.data?.[0]?.b64_json;
       if (b64) break;
       lastErr = new Error("La API no retornó imagen (b64_json vacío).");
@@ -357,9 +388,18 @@ export async function generateBannerJPG({
   const rawBuffer = Buffer.from(b64, "base64");
   await writeBuffer(tmpPath, rawBuffer);
 
-  await sharp(tmpPath).rotate().toColourspace("srgb").jpeg({ quality: 90, mozjpeg: true }).toFile(rawPath);
+  await sharp(tmpPath)
+    .rotate()
+    .toColourspace("srgb")
+    .jpeg({ quality: 90, mozjpeg: true })
+    .toFile(rawPath);
 
-  await normalizeJpeg(tmpPath, finalPath, { mode, width: 1792, height: 1024, quality: 86 });
+  await normalizeJpeg(tmpPath, finalPath, {
+    mode,
+    width: 1792,
+    height: 1024,
+    quality: 86,
+  });
 
   try {
     await fs.unlink(tmpPath);
@@ -373,6 +413,13 @@ export async function generateBannerJPG({
     fileName: finalName,
     url: finalName,
     rawFileName: rawName,
-    meta: { model, size, width: realW, height: realH, quality, sizeNormalized: `${realW}x${realH}` },
+    meta: {
+      model,
+      size,
+      width: realW,
+      height: realH,
+      quality,
+      sizeNormalized: `${realW}x${realH}`,
+    },
   };
 }

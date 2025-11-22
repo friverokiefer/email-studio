@@ -1,5 +1,5 @@
 // frontend/src/lib/apiEmailV2.ts
-import { apiJson } from "./api";
+import { apiJson, API_BASE as API_V2_BASE } from "./api";
 
 /** ========= Tipos Email 2.0 ========= **/
 
@@ -296,4 +296,46 @@ export async function postSfmcDraftEmail(
     },
     opts
   );
+}
+
+/** ========== Manual image upload (Drag & Drop) ========== */
+
+export type ManualImageUploadResponse = {
+  ok: boolean;
+  batchId: string;
+  image: EmailV2Image;
+};
+
+export async function uploadManualImageToBatch(
+  batchId: string,
+  file: File,
+  opts?: { signal?: AbortSignal }
+): Promise<ManualImageUploadResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(
+    `${API_V2_BASE}/api/email-v2/batch/${encodeURIComponent(
+      batchId
+    )}/images/manual-upload`,
+    {
+      method: "POST",
+      body: formData,
+      signal: opts?.signal,
+    }
+  );
+
+  if (!res.ok) {
+    let message = "Error subiendo imagen manual.";
+    try {
+      const text = await res.text();
+      if (text) message = text;
+    } catch {
+      // ignore
+    }
+    throw new Error(message);
+  }
+
+  const data = (await res.json()) as ManualImageUploadResponse;
+  return data;
 }

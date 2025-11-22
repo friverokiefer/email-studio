@@ -12,6 +12,7 @@ import {
 } from "./routes/generateEmailV2";
 import { generatedRouter } from "./routes/generated";
 import { sfmcRouter } from "./routes/sfmc";
+import { emailV2ManualImageRouter } from "./routes/emailV2ManualImage";
 
 import { CFG } from "./services/gcpStorage";
 
@@ -95,6 +96,10 @@ app.use("/api/history", historyRouter);
 // GET /api/email-v2/meta2
 // GET /api/email-v2
 app.use("/api/email-v2", emailV2MetaRouter);
+
+// Carga manual de imágenes para un batch:
+// POST /api/email-v2/batch/:batchId/images/manual-upload
+app.use("/api/email-v2", emailV2ManualImageRouter);
 
 // Alias plural para compatibilidad:
 // GET /api/emails-v2/meta

@@ -1,6 +1,14 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+// frontend/src/components/Email2Workspace.tsx
+import React, {
+  useState,
+  useMemo,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
 import type { EmailV2Image, EmailContentSet } from "@/lib/apiEmailV2";
 import { EmailPreview } from "./EmailPreview";
+import { ManualImageDropzone } from "./ManualImageDropzone";
 
 export type { EmailContentSet } from "@/lib/apiEmailV2";
 
@@ -41,7 +49,7 @@ function gcsDirectObjectUrl(batchId: string, fileName: string) {
     VITE_GCS_PREFIX,
     "emails_v2",
     batchId,
-    fileName,
+    fileName
   );
   return `https://storage.googleapis.com/${VITE_GCS_BUCKET}/${path}`;
 }
@@ -69,7 +77,9 @@ function normalizeSet(t: EmailContentSet): EmailContentSet {
   };
 }
 
-function normalizeSets(arr: EmailContentSet[] | undefined | null): EmailContentSet[] {
+function normalizeSets(
+  arr: EmailContentSet[] | undefined | null
+): EmailContentSet[] {
   if (!Array.isArray(arr)) return [];
   return arr.map((t) => normalizeSet(t));
 }
@@ -82,6 +92,7 @@ export function Email2Workspace({
   showInternalPreview = true,
   onPreviewChange,
   onEditedChange,
+  onImagesChange,
 }: {
   batchId: string;
   trios: EmailContentSet[];
@@ -89,14 +100,21 @@ export function Email2Workspace({
   showInternalPreview?: boolean;
   onPreviewChange?: (data: PreviewData | null) => void;
   onEditedChange?: (sets: EmailContentSet[]) => void;
+  onImagesChange?: (images: EmailV2Image[]) => void; // callback opcional para actualizar imágenes en el padre
 }) {
-  const [edited, setEdited] = useState<EmailContentSet[]>(() => normalizeSets(trios));
-  const [selectedSet, setSelectedSet] = useState<number | null>((trios || []).length ? 0 : null);
-  const [selectedImage, setSelectedImage] = useState<number | null>(images.length ? 0 : null);
+  const [edited, setEdited] = useState<EmailContentSet[]>(() =>
+    normalizeSets(trios)
+  );
+  const [selectedSet, setSelectedSet] = useState<number | null>(
+    (trios || []).length ? 0 : null
+  );
+  const [selectedImage, setSelectedImage] = useState<number | null>(
+    images.length ? 0 : null
+  );
 
   const prevBatchRef = useRef<string | null>(null);
 
-  // Reset on batch change
+  // Reset al cambiar el batch
   useEffect(() => {
     if (prevBatchRef.current !== batchId) {
       prevBatchRef.current = batchId;
@@ -107,7 +125,7 @@ export function Email2Workspace({
     }
   }, [batchId, trios, images]);
 
-  // Sync images
+  // Sincronizar selección de imagen cuando cambie la lista
   useEffect(() => {
     if (prevBatchRef.current !== batchId) return;
     setSelectedImage((prev) => {
@@ -118,12 +136,12 @@ export function Email2Workspace({
     });
   }, [images, batchId]);
 
-  // Notify parent
+  // Notificar cambios de texto al padre
   useEffect(() => {
     onEditedChange?.(edited);
   }, [edited, onEditedChange]);
 
-  // Updates
+  // Updates de texto
   const updateSet = (idx: number, patch: Partial<EmailContentSet>) => {
     setEdited((prev) => {
       const next = [...prev];
@@ -132,10 +150,16 @@ export function Email2Workspace({
     });
   };
 
-  const updateSetBody = (idx: number, patch: Partial<EmailContentSet["body"]>) => {
+  const updateSetBody = (
+    idx: number,
+    patch: Partial<EmailContentSet["body"]>
+  ) => {
     setEdited((prev) => {
       const next = [...prev];
-      next[idx] = normalizeSet({ ...next[idx], body: { ...next[idx].body, ...patch } });
+      next[idx] = normalizeSet({
+        ...next[idx],
+        body: { ...next[idx].body, ...patch },
+      });
       return next;
     });
   };
@@ -145,6 +169,17 @@ export function Email2Workspace({
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
   };
+
+  // Cuando el Dropzone sube una imagen manual
+  const handleImageUploaded = useCallback(
+    (img: EmailV2Image) => {
+      const next = [...images, img];
+      onImagesChange?.(next);
+      // UX: seleccionar automáticamente la nueva imagen como activa
+      setSelectedImage(next.length - 1);
+    },
+    [images, onImagesChange]
+  );
 
   // Preview
   const preview = useMemo<PreviewData | null>(() => {
@@ -175,8 +210,9 @@ export function Email2Workspace({
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
       <div className="mx-auto flex w-full max-w-[840px] flex-col px-3 lg:px-3.5 py-2 lg:py-3.5">
-
-        {/* SETS DE CONTENIDO */}
+        {/* ====================== */}
+        {/* SETS DE CONTENIDO      */}
+        {/* ====================== */}
         <section className="mb-3">
           <div className="sticky top-0 z-30 -mx-3 lg:-mx-3.5 px-3 lg:px-3.5 py-1.5 bg-slate-50/95 backdrop-blur-md mb-2.5 border-b border-slate-200 shadow-sm flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -185,7 +221,9 @@ export function Email2Workspace({
                 <h3 className="text-[13px] font-semibold text-slate-800 tracking-tight">
                   Editor de Texto
                 </h3>
-                <p className="text-[9px] text-slate-500">Selecciona y edita una variante.</p>
+                <p className="text-[9px] text-slate-500">
+                  Selecciona y edita una variante.
+                </p>
               </div>
             </div>
             {edited.length > 0 && (
@@ -198,7 +236,9 @@ export function Email2Workspace({
           {edited.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-200 bg-white/50 p-5 text-center min-h-[180px]">
               <div className="text-3xl mb-2 opacity-30">📝</div>
-              <h4 className="text-slate-500 font-medium text-xs">Esperando generación...</h4>
+              <h4 className="text-slate-500 font-medium text-xs">
+                Esperando generación...
+              </h4>
             </div>
           ) : (
             <div className="group/track flex gap-2.5 pb-3 overflow-x-auto snap-x snap-mandatory scroll-smooth px-0.5">
@@ -218,7 +258,6 @@ export function Email2Workspace({
                     `}
                     style={{ width: "300px" }}
                   >
-
                     {/* HEADER */}
                     <div
                       className={`
@@ -262,7 +301,6 @@ export function Email2Workspace({
 
                     {/* CAMPOS */}
                     <div className="p-3 space-y-2.5 bg-slate-50/30 flex-1">
-
                       {/* SUBJECT */}
                       <div>
                         <label className={labelStyle}>Asunto (Subject)</label>
@@ -272,7 +310,9 @@ export function Email2Workspace({
                           onInput={autoResize}
                           style={{ minHeight: 48 }}
                           value={t.subject || ""}
-                          onChange={(e) => updateSet(idx, { subject: e.target.value })}
+                          onChange={(e) =>
+                            updateSet(idx, { subject: e.target.value })
+                          }
                         />
                       </div>
 
@@ -285,7 +325,9 @@ export function Email2Workspace({
                           onInput={autoResize}
                           style={{ minHeight: 48 }}
                           value={t.preheader || ""}
-                          onChange={(e) => updateSet(idx, { preheader: e.target.value })}
+                          onChange={(e) =>
+                            updateSet(idx, { preheader: e.target.value })
+                          }
                         />
                       </div>
 
@@ -300,7 +342,9 @@ export function Email2Workspace({
                           onInput={autoResize}
                           style={{ minHeight: 48 }}
                           value={t.body.title || ""}
-                          onChange={(e) => updateSetBody(idx, { title: e.target.value })}
+                          onChange={(e) =>
+                            updateSetBody(idx, { title: e.target.value })
+                          }
                         />
                       </div>
 
@@ -313,20 +357,24 @@ export function Email2Workspace({
                           onInput={autoResize}
                           style={{ minHeight: 110 }}
                           value={t.body.subtitle || ""}
-                          onChange={(e) => updateSetBody(idx, { subtitle: e.target.value })}
+                          onChange={(e) =>
+                            updateSetBody(idx, { subtitle: e.target.value })
+                          }
                         />
                       </div>
 
-                      {/* CONTENT — AHORA 15 LÍNEAS */}
+                      {/* CONTENT */}
                       <div>
                         <label className={labelStyle}>Cuerpo del mensaje</label>
                         <textarea
                           className={inputBaseStyle}
                           rows={15}
                           onInput={autoResize}
-                          style={{ minHeight: 275 }}  // ≈ 15 líneas
+                          style={{ minHeight: 275 }} // ≈ 15 líneas
                           value={t.body.content || ""}
-                          onChange={(e) => updateSetBody(idx, { content: e.target.value })}
+                          onChange={(e) =>
+                            updateSetBody(idx, { content: e.target.value })
+                          }
                         />
                       </div>
                     </div>
@@ -337,8 +385,11 @@ export function Email2Workspace({
           )}
         </section>
 
-        {/* IMÁGENES */}
+        {/* ====================== */}
+        {/* IMÁGENES               */}
+        {/* ====================== */}
         <section className="pt-2 border-t border-slate-200 pb-8">
+          {/* Título principal de la sección de imágenes */}
           <div className="sticky top-0 z-20 -mx-3 lg:-mx-3.5 px-3 lg:px-3.5 py-1.5 bg-slate-50/95 backdrop-blur-md mb-2 border-b border-slate-200 shadow-sm flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-base">🖼️</span>
@@ -346,7 +397,10 @@ export function Email2Workspace({
                 <h3 className="text-[13px] font-semibold text-slate-800 tracking-tight">
                   Galería de Imágenes
                 </h3>
-                <p className="text-[9px] text-slate-500">Selecciona la imagen Hero.</p>
+                <p className="text-[9px] text-slate-500">
+                  Selecciona la imagen Hero generada por la IA o cargada
+                  manualmente para este batch.
+                </p>
               </div>
             </div>
             {images.length > 0 && (
@@ -356,13 +410,14 @@ export function Email2Workspace({
             )}
           </div>
 
+          {/* Galería de imágenes */}
           {images.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-200 bg-white/50 p-4 text-center h-28">
               <div className="text-3xl mb-2 opacity-30">🖼️</div>
               <p className="text-slate-400 text-xs">Sin imágenes aún.</p>
             </div>
           ) : (
-            <div className="flex gap-2.5 pb-2 overflow-x-auto snap-x snap-mandatory scroll-smooth px-0.5">
+            <div className="flex gap-2.5 pb-3 overflow-x-auto snap-x snap-mandatory scroll-smooth px-0.5">
               {images.map((img, idx) => {
                 const active = selectedImage === idx;
                 const hero = absoluteHeroUrl(batchId, img);
@@ -375,7 +430,7 @@ export function Email2Workspace({
                       snap-start group relative flex-none rounded-2xl overflow-hidden border-2 transition-all duration-200 aspect-video bg-white shadow-sm text-left
                       ${
                         active
-                          ? "border-sky-500 ring-4 ring-sky-500/10 shadow-xl translate-y-[-2px]"
+                          ? "border-sky-500 ring-4 ring-sky-500/10 shadow-xl -translate-y-[2px]"
                           : "border-transparent hover:border-slate-300 hover:shadow-md"
                       }
                     `}
@@ -391,7 +446,7 @@ export function Email2Workspace({
                       className={`absolute top-2 right-2 rounded-full p-1.5 transition-all duration-200 ${
                         active
                           ? "bg-sky-500 text-white scale-100 shadow-lg"
-                          : "bg-black/40 text-white/70 scale-90 hover:scale-100"
+                          : "bg-black/40 text-white/70 scale-90 group-hover:scale-100"
                       }`}
                     >
                       {active ? (
@@ -402,7 +457,11 @@ export function Email2Workspace({
                           stroke="currentColor"
                           strokeWidth={3}
                         >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M5 13l4 4L19 7"
+                          />
                         </svg>
                       ) : (
                         <div className="w-4 h-4 rounded-full border-2 border-current" />
@@ -417,6 +476,35 @@ export function Email2Workspace({
                   </button>
                 );
               })}
+            </div>
+          )}
+
+          {/* ============================ */}
+          {/* CARGA MANUAL DE IMÁGENES     */}
+          {/* ============================ */}
+          {batchId && (
+            <div className="mt-4 pt-3 border-t border-dashed border-slate-200 space-y-2">
+              <div className="flex items-center px-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">📂</span>
+                  <div>
+                    <h4 className="text-[12px] font-semibold text-slate-800 tracking-tight">
+                      Carga manual de imágenes
+                    </h4>
+                    <p className="text-[9px] text-slate-500">
+                      Usa esta sección para añadir assets finales o aprobados
+                      fuera de la IA. Se guardan en el mismo batch y quedarán
+                      marcados como{" "}
+                      <span className="font-mono">manual-upload</span>.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <ManualImageDropzone
+                batchId={batchId}
+                onUploaded={handleImageUploaded}
+              />
             </div>
           )}
         </section>

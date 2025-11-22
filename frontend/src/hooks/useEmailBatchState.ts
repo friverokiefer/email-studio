@@ -17,7 +17,7 @@ export function useEmailBatchState() {
 
   // Referencia mutable para ediciones sin re-render excesivo
   const editedRef = useRef<EmailContentSet[] | null>(null);
-  
+
   // Timers de feedback visual
   const hideSavedRef = useRef<number | undefined>(undefined);
   const clearSavedRef = useRef<number | undefined>(undefined);
@@ -81,10 +81,16 @@ export function useEmailBatchState() {
 
       if (hideSavedRef.current) window.clearTimeout(hideSavedRef.current);
       if (clearSavedRef.current) window.clearTimeout(clearSavedRef.current);
-      
+
       setSavedVisible(true);
-      hideSavedRef.current = window.setTimeout(() => setSavedVisible(false), 2800);
-      clearSavedRef.current = window.setTimeout(() => setLastSavedAt(null), 3600);
+      hideSavedRef.current = window.setTimeout(
+        () => setSavedVisible(false),
+        2800
+      );
+      clearSavedRef.current = window.setTimeout(
+        () => setLastSavedAt(null),
+        3600
+      );
 
       // Sincronizar estado con lo guardado
       if (editedRef.current) setContentSets(editedRef.current);
@@ -109,6 +115,7 @@ export function useEmailBatchState() {
     editedRef,
     // Setters
     setLivePreview,
+    setImages,        // 👈 nuevo: para actualizar imágenes (incluye las manuales)
     // Actions
     handleGenerated,
     handleEditedChange,

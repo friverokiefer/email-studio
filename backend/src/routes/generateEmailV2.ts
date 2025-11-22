@@ -307,10 +307,13 @@ generateEmailsV2Router.post("/", async (req, res) => {
         mode: "cover",
       });
       const t1 = Date.now();
-      console.log(`[emails_v2] image ${i + 1}/${imageCount} ready in ${t1 - t0}ms`, {
-        fileName: img.fileName,
-        meta: img.meta,
-      });
+      console.log(
+        `[emails_v2] image ${i + 1}/${imageCount} ready in ${t1 - t0}ms`,
+        {
+          fileName: img.fileName,
+          meta: img.meta,
+        }
+      );
 
       if (aborted) {
         console.warn("[emails_v2] abort detected after image gen — stopping early");
