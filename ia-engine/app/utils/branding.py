@@ -15,14 +15,15 @@ BICE_VISUAL_IDENTITY = (
     "COLORS: Corporate palette accents (Deep Navy Blue and Bright Cyan/Turquoise) integrated naturally in clothing or props."
 )
 
-# AJUSTE CRÍTICO: Anclaje de Identidad + Diversidad Coherente
+# AJUSTE CRÍTICO DE BLINDAJE DEMOGRÁFICO: Se refuerzan las restricciones raciales/étnicas negativas.
 BICE_DEMOGRAPHIC_BASE = (
     "SUBJECTS IDENTITY (STRICT): "
     "The subjects are ALWAYS Chilean/Southern Cone people (Western-Latin phenotype). "
 
-    # 1. REGLA DE APARIENCIA (High-End & Diversidad)
+    # 1. REGLA DE APARIENCIA (High-End & Diversidad Coherente)
     "APPEARANCE: Sophisticated, elegant, and well-groomed. "
-    "Physical traits: Light to Medium-Olive skin tone. "
+    # REFUERZO DE COLOR DE PIEL
+    "Physical traits: **Light to Medium-Olive skin tone (Mediterranean/Hispanic phenotype)**. "
     "HAIR: Predominantly Dark Brown/Black. "
     "However, include Natural Blonde, Light Brown, or Red hair in a realistic proportion (approx 10-15% chance) to reflect the diversity of this segment. "
 
@@ -35,8 +36,9 @@ BICE_DEMOGRAPHIC_BASE = (
     # 3. REGLA DE VESTUARIO
     "ATTIRE: Smart casual luxury (Linen shirts, blazers, high-quality knitwear). No ties, no hiking gear."
 
-    "NEGATIVE PROMPT: "
+    "NEGATIVE PROMPT (CRITICAL): "  # REFUERZO DE LAS RESTRICCIONES NEGATIVAS
     "Do NOT generate subjects matching the ethnicity of the background location. "
+    "**Do NOT generate Black, East Asian, or Indian phenotypes.** "  # BLINDAJE DIRECTO
     "Do NOT generate messy hair, oversized backpacks, or sloppy clothing. "
     "Do NOT generate disconnected characters (Zombie stare)."
 )

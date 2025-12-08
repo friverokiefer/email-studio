@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 import json
-import random
 from typing import Tuple, Any
 
 from app.utils.branding import (
@@ -37,9 +36,18 @@ PRODUCT_RULES = (
 
 
 def _json_only_clause() -> str:
-    return "IMPORTANTE: Responde ÚNICAMENTE con el objeto JSON válido. Sin markdown, sin explicaciones."
+    """
+    Instrucción crítica que ahora PROHIBE negritas (**) y permite SÓLO listas (-).
+    """
+    return (
+        "IMPORTANTE: Tu respuesta debe ser UNICAMENTE un objeto JSON válido raw. "
+        "NO uses bloques de código (```json ... ```). "
+        "DENTRO de los campos de texto (body), USA SOLO formato de Markdown para listas con guiones (-). "
+        "PROHIBIDO: No uses negritas (**) ni cursivas (*)."
+    )
 
 
+# [Otras funciones auxiliares como _extract_feedback_text, _extract_visual_feedback, _detect_subject_age se mantienen sin cambios]
 def _extract_feedback_text(feedback: Any) -> str:
     if not feedback:
         return ""
@@ -82,37 +90,41 @@ def _extract_visual_feedback(feedback: Any) -> str | None:
         return None
 
 
-def _get_dynamic_structure() -> str:
+def _get_consistent_structure(campaign: str) -> str:
     """
-    Selecciona aleatoriamente una estructura de cuerpo para dar variedad y naturalidad.
+    Define la estructura con 'Creatividad Controlada' y más flexibilidad para omitir listas.
     """
-    styles = [
-        # Opción 1: Clásico Detallado (3-5 bullets)
-        (
-            "ESTILO DE CUERPO: 'Detallado'.\n"
-            "Estructura: Párrafo introductorio breve + Lista de 3 a 5 Beneficios (Bullets) + Cierre.\n"
-            "Objetivo: Mostrar valor explícito y múltiples razones para contratar."
-        ),
-        # Opción 2: Minimalista (2-3 bullets)
-        (
-            "ESTILO DE CUERPO: 'Directo'.\n"
-            "Estructura: Párrafo introductorio con gancho + Lista corta de 2 a 3 Puntos Clave + Cierre rápido.\n"
-            "Objetivo: Ser conciso, ideal para lectura rápida en móvil."
-        ),
-        # Opción 3: Narrativo (Sin bullets o muy pocos)
-        (
-            "ESTILO DE CUERPO: 'Narrativo/Fluido'.\n"
-            "Estructura: Dos párrafos cortos y persuasivos bien conectados. (Opcional: máximo 1-2 bullets si es crítico).\n"
-            "Objetivo: Crear una lectura fluida, elegante y menos esquemática. Ideal para clientes Banca Privada."
+    camp_lower = campaign.lower()
+
+    # GRUPO 1: Productos Complejos / Serios (Inversiones, Hipotecarios, etc)
+    complex_products = ["inversión", "fondo",
+                        "hipotecario", "dap", "vida", "seguro"]
+
+    if any(x in camp_lower for x in complex_products):
+        return (
+            "ESTILO DE CUERPO: 'Profesional Flexible'.\n"
+            "Estructura Sugerida: Intro empática + CUERPO ADAPTABLE + Cierre con CTA.\n"
+            "OPCIONES PARA EL CUERPO (Elige la mejor para este texto):\n"
+            "A) Lista de 3 a 5 puntos usando guiones '-' (Ideal para enumerar características o beneficios técnicos).\n"
+            "B) Narrativa fluida de 2-3 párrafos (Ideal si el mensaje es emocional o de 'tranquilidad').\n"
+            "Decisión Crítica: Si la longitud del cuerpo es corta (menos de 6 líneas), favorece la narrativa (B) para que el correo no se vea mecanizado. Prioriza la claridad sobre la formalidad."
         )
-    ]
-    return random.choice(styles)
+
+    # GRUPO 2: Productos Ágiles / Consumo (Tarjetas, Apps, Go Bice)
+    return (
+        "ESTILO DE CUERPO: 'Ágil y Directo'.\n"
+        "Estructura Sugerida: Gancho corto + CUERPO DINÁMICO + Cierre rápido.\n"
+        "OPCIONES PARA EL CUERPO (Elige la mejor):\n"
+        "A) Lista corta de 2 a 3 puntos clave usando guiones '-' (Para beneficios directos como descuentos).\n"
+        "B) Texto fluido, un párrafo corto y potente (Para invitaciones rápidas o mensajes de estilo de vida).\n"
+        "Decisión Crítica: Si el mensaje se puede decir de forma concisa en un párrafo, omite la lista. "
+        "Objetivo: Ser conciso (Skimmable content)."
+    )
 
 
 def _detect_subject_age(cluster: str) -> str:
     """
     Determina la edad aproximada del sujeto para consistencia visual.
-    Soluciona el problema de GO Bice pareciendo muy mayor.
     """
     c_lower = cluster.lower()
 
@@ -135,8 +147,8 @@ def build_email_prompt(campaign: str, cluster: str, feedback: Any = None, varian
     feedback_str = _extract_feedback_text(feedback)
     cluster_desc = describe_cluster(cluster, normalized_camp)
 
-    # Inyectamos la estructura aleatoria
-    dynamic_body_rules = _get_dynamic_structure()
+    # Inyectamos la estructura FLEXIBLE basada en campaña
+    dynamic_body_rules = _get_consistent_structure(normalized_camp)
 
     system = (
         f"{BICE_TEXT_TONE}\n\n"

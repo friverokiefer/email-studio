@@ -191,7 +191,11 @@ export function Email2Sidebar({
   const elapsedLabel = useMemo(() => formatDuration(elapsed), [elapsed]);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
+  
+  // -- ESTADO E HISTORIAL --
   const [history, setHistory] = useState<HistoryBatch[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  
   const [query, setQuery] = useState("");
   const [activeBatchId, setActiveBatchId] = useState<string | undefined>(
     currentBatchId
@@ -226,24 +230,38 @@ export function Email2Sidebar({
     return () => clearInterval(t);
   }, [isGenerating, startedAt]);
 
-  // Cargar Historial
+  // Cargar Historial (Optimizado con Loader)
   const refreshHistory = useCallback(async (silent = true) => {
+    // Si no es silencioso (ej: carga inicial), mostramos el loader local
+    if (!silent) setIsHistoryLoading(true);
+    
+    // Si es silencioso (ej: auto-update), podemos optar por no bloquear,
+    // pero para la carga inicial desde el botón "CARGAR" o mount, usamos true.
+    // Aquí forzamos true siempre que se llame explícitamente excepto en background.
+    // Ajuste: Para simplificar, usamos el loader si el historial está vacío o si se pide explícitamente.
+    if (history.length === 0) setIsHistoryLoading(true);
+
     try {
       const data = await listHistory("emails_v2");
       setHistory(data);
     } catch {
       if (!silent) toast.error("Error actualizando historial.");
+    } finally {
+      setIsHistoryLoading(false);
     }
-  }, []);
+  }, [history.length]); // Dependencia segura
 
+  // Efecto de carga inicial
   useEffect(() => {
-    refreshHistory(true);
-  }, [refreshHistory]);
+    refreshHistory(true); 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); 
 
   const catchUpHistoryFor = useCallback((targetBatchId: string) => {
     const delays = [700, 1500, 3500];
     const run = async () => {
       try {
+        // Ejecutamos en segundo plano sin activar el loader UI para no molestar
         const data = await listHistory("emails_v2");
         setHistory(data);
         if (data.some((h) => h.batchId === targetBatchId)) {
@@ -312,15 +330,24 @@ export function Email2Sidebar({
     if (!inputVal) return;
     const bid = extractBatchId(inputVal) || inputVal.trim();
     if (!bid) return toast.error("ID no válido.");
+    
+    // Al cargar manual, activamos loader de historial para dar feedback visual
+    setIsHistoryLoading(true); 
     const toastId = toast.loading("Cargando lote...");
+    
     try {
       const resp = await loadHistoryBatch(bid);
       setActiveBatchId(resp.batchId);
       onGenerated?.(resp);
       toast.success(`Lote ${resp.batchId} cargado`, { id: toastId });
-      refreshHistory(true);
+      
+      // Refrescamos la lista para asegurarnos que el lote aparezca
+      const data = await listHistory("emails_v2");
+      setHistory(data);
     } catch (e: any) {
       toast.error(`Error: ${e.message}`, { id: toastId });
+    } finally {
+      setIsHistoryLoading(false);
     }
   }
 
@@ -332,7 +359,6 @@ export function Email2Sidebar({
   }, [history, query]);
 
   const batchJsonLink = activeBatchId ? gcsBatchJsonUrl(activeBatchId) : null;
-  // CORRECCIÓN: isFormValid debe ser boolean estricto
   const isFormValid = Boolean(state.campaign && state.cluster);
 
   // Encontrar descripción seleccionada para mostrar en UI
@@ -358,7 +384,7 @@ export function Email2Sidebar({
 
   return (
     <div className="font-sans space-y-6 pb-10">
-      {/* Header (Mantenido) */}
+      {/* Header */}
       <div className="space-y-3 pb-1">
         <div className="flex items-center justify-between px-1">
           <h3 className="text-lg font-bold text-slate-800 tracking-tight">
@@ -575,7 +601,7 @@ export function Email2Sidebar({
         </div>
       </Collapsible>
 
-      {/* 4. Historial (Mantenido) */}
+      {/* 4. Historial (Optimizado y Corregido) */}
       <Collapsible title="🕓 Historial" defaultOpen={false}>
         <div className="space-y-2">
           <div className="flex gap-2">
@@ -585,10 +611,11 @@ export function Email2Sidebar({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleLoadBatch(query)}
+              disabled={isHistoryLoading} 
             />
             <button
               onClick={() => handleLoadBatch(query)}
-              disabled={!query}
+              disabled={!query || isHistoryLoading} 
               className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold text-slate-600 transition-colors"
             >
               CARGAR
@@ -596,7 +623,12 @@ export function Email2Sidebar({
           </div>
 
           <div className="max-h-[200px] overflow-y-auto rounded-lg border border-slate-100">
-            {filteredHistory.length === 0 ? (
+            {isHistoryLoading ? (
+              <div className="p-4 text-xs text-slate-400 text-center flex items-center justify-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Cargando historial...
+              </div>
+            ) : filteredHistory.length === 0 ? (
               <div className="p-4 text-xs text-slate-400 text-center italic">
                 Sin resultados
               </div>

@@ -65,8 +65,9 @@ def generate_sets(request: GenerateRequest) -> List[GeneratedVariant]:
     total_sets = max(1, min(5, int(getattr(request, "sets", 1))))
     variants = []
 
-    # Leemos la temperatura creativa del entorno (Default: 0.85)
-    creative_temp = float(os.getenv("OPENAI_CREATIVE_TEMP", "0.85"))
+    # Leemos la temperatura creativa del entorno
+    # AJUSTE: Bajamos el default de 0.85 a 0.6 para asegurar consistencia en formato JSON y reglas negativas.
+    creative_temp = float(os.getenv("OPENAI_CREATIVE_TEMP", "0.7"))
 
     # Log con la temperatura real que se usará
     logger.info("Generando %d variantes para '%s' (Temp %.2f)",
