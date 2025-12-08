@@ -137,3 +137,4 @@ htmlcov/
 # Config local del masterkey (no se versiona)
 masterkey.local.*
 masterkey.local.json
+masterkey.py
