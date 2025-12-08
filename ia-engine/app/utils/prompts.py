@@ -2,8 +2,9 @@
 """Construcción de prompts para el motor de texto e imagen."""
 
 from __future__ import annotations
-import json
 from typing import Tuple, Any
+
+# Se eliminó "import json" porque no se usaba (Fix Pylint W0611)
 
 from app.utils.branding import (
     BICE_TEXT_TONE,
@@ -47,7 +48,6 @@ def _json_only_clause() -> str:
     )
 
 
-# [Otras funciones auxiliares como _extract_feedback_text, _extract_visual_feedback, _detect_subject_age se mantienen sin cambios]
 def _extract_feedback_text(feedback: Any) -> str:
     if not feedback:
         return ""
@@ -66,7 +66,8 @@ def _extract_feedback_text(feedback: Any) -> str:
             if getattr(feedback, "bodyContent", None):
                 parts.append(f"Content Focus: {feedback.bodyContent}")
         return " | ".join(parts)
-    except:
+    except Exception:  # pylint: disable=broad-exception-caught
+        # Capturamos todo para evitar romper el flujo por un error de formato en el feedback opcional
         return str(feedback)
 
 
@@ -86,7 +87,7 @@ def _extract_visual_feedback(feedback: Any) -> str | None:
         if text and len(text) > 5:
             return text
         return None
-    except:
+    except Exception:  # pylint: disable=broad-exception-caught
         return None
 
 
