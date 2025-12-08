@@ -14,15 +14,18 @@ type ManualImageDropzoneProps = {
   onUploaded?: (image: EmailV2Image) => void;
 };
 
+// CONFIGURACIÓN
 const ALLOWED_MIME = ["image/jpeg", "image/png", "image/svg+xml"];
-const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+const MAX_SIZE_BYTES = 15 * 1024 * 1024; // 15MB
 
 export function ManualImageDropzone({
   batchId,
   onUploaded,
 }: ManualImageDropzoneProps) {
+  // Volvemos a lógica singular (1 sola imagen) para asegurar estabilidad
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -46,7 +49,7 @@ export function ManualImageDropzone({
   const handleFiles = useCallback(
     (files: FileList | null) => {
       if (!files || files.length === 0) return;
-      const f = files[0];
+      const f = files[0]; // Tomamos solo el primero
 
       const mimeOk =
         ALLOWED_MIME.includes(f.type) ||
@@ -58,10 +61,11 @@ export function ManualImageDropzone({
       }
 
       if (f.size > MAX_SIZE_BYTES) {
-        toast.error("La imagen es demasiado pesada (máx 10MB).");
+        toast.error("La imagen es demasiado pesada (máx 15MB).");
         return;
       }
 
+      // Reemplazamos si ya había una
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setFile(f);
       setPreviewUrl(URL.createObjectURL(f));
@@ -94,12 +98,17 @@ export function ManualImageDropzone({
     handleFiles(e.target.files);
   };
 
+  // Click en el contenedor abre el selector (pero no si viene del botón)
   const handleClick = () => {
     if (isUploading) return;
     inputRef.current?.click();
   };
 
-  const handleUpload = async () => {
+  const handleUpload = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    // 🛑 IMPORTANTE: Detenemos la propagación del click hacia el contenedor padre
+    e.stopPropagation(); 
+    e.preventDefault();
+
     if (!batchId) {
       toast.error("Primero selecciona o genera un lote.");
       return;
@@ -111,29 +120,38 @@ export function ManualImageDropzone({
 
     try {
       setIsUploading(true);
+      // Subida de imagen única
       const resp = await uploadManualImageToBatch(batchId, file);
+      
       if (!resp?.image) {
-        throw new Error("Respuesta inesperada del servidor.");
+        throw new Error("El servidor no devolvió la imagen procesada.");
       }
+      
       onUploaded?.(resp.image);
-      toast.success("Imagen subida y asociada al batch.");
-      reset();
-    } catch (e: any) {
-      toast.error(e?.message || "Error al subir la imagen.");
-      console.error("[ManualImageDropzone] upload error:", e);
+      toast.success("Imagen subida correctamente.");
+      reset(); // Limpiamos el estado tras éxito
+
+    } catch (err: any) {
+      // Manejo específico si es error 413 (aunque suele venir como excepción genérica de red)
+      if (err.message?.includes("413") || err.response?.status === 413) {
+        toast.error("Error: La imagen es muy pesada para el servidor (Nginx 413).");
+      } else {
+        toast.error(err?.message || "Error al subir la imagen.");
+      }
+      console.error("[ManualImageDropzone] upload error:", err);
     } finally {
       setIsUploading(false);
     }
   };
 
-  // Sin batchId, no se renderiza (regla de negocio)
+  // Sin batchId, no se renderiza
   if (!batchId) return null;
 
   const hasFile = !!file;
 
   const containerClasses = [
     "relative flex flex-col md:flex-row gap-3 rounded-2xl border-2 border-dashed px-3 py-3 md:px-4 md:py-3 bg-white/70 transition-all",
-    "cursor-pointer",
+    "cursor-pointer", // Indica interactividad
     isDragging
       ? "border-sky-500 bg-sky-50/60"
       : "border-slate-200 hover:border-sky-300 hover:bg-slate-50/80",
@@ -149,8 +167,9 @@ export function ManualImageDropzone({
         onDrop={handleDrop}
         onClick={handleClick}
       >
+        {/* Lado Izquierdo: Icono y Texto */}
         <div className="flex-1 flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-100 text-sky-700 text-lg">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-100 text-sky-700 text-lg shrink-0">
             🖱️
           </div>
           <div className="space-y-0.5">
@@ -158,15 +177,15 @@ export function ManualImageDropzone({
               Subir imagen manual al batch
             </p>
             <p className="text-[10px] text-slate-500">
-              Arrastra un archivo JPG, PNG o SVG, o haz clic para seleccionar.
+              Arrastra 1 archivo JPG, PNG o SVG (Máx 15MB).
             </p>
             <p className="text-[9px] text-slate-400">
-              Se guardará en la carpeta del lote y se registrará como{" "}
-              <span className="font-mono">model: "manual-upload"</span>.
+              Se guardará como <span className="font-mono">model: "manual-upload"</span>.
             </p>
           </div>
         </div>
 
+        {/* Lado Derecho: Botón e Info */}
         <div className="flex flex-col items-end justify-between gap-2">
           {hasFile ? (
             <div className="flex flex-col items-end text-right">
@@ -178,8 +197,8 @@ export function ManualImageDropzone({
               </span>
             </div>
           ) : (
-            <span className="text-[10px] text-slate-400">
-              Ningún archivo seleccionado
+            <span className="text-[10px] text-slate-400 text-right">
+              Ningún archivo
             </span>
           )}
 
@@ -189,17 +208,19 @@ export function ManualImageDropzone({
             onClick={handleUpload}
             className={[
               "mt-1 inline-flex items-center justify-center rounded-xl px-3 py-1.5 text-[11px] font-semibold shadow-sm transition",
+              "relative z-10", // Asegura prioridad de click sobre el contenedor
               !hasFile || isUploading
                 ? "bg-slate-200 text-slate-400 cursor-not-allowed"
                 : "bg-sky-600 text-white hover:bg-sky-700 active:scale-[0.98]",
             ].join(" ")}
           >
-            {isUploading ? "Subiendo…" : "Cargar al batch"}
+            {isUploading ? "Subiendo..." : "Cargar al batch"}
           </button>
         </div>
 
+        {/* Preview (Miniatura Única) */}
         {previewUrl && (
-          <div className="mt-3 md:mt-0 md:ml-4 flex items-center justify-center">
+          <div className="mt-3 md:mt-0 md:ml-4 flex items-center justify-center shrink-0">
             <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs w-24 h-16">
               <img
                 src={previewUrl}

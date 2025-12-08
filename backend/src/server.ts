@@ -5,7 +5,7 @@ import cors from "cors";
 
 import { historyRouter } from "./routes/history";
 import { emailV2MetaRouter } from "./routes/emailV2Meta";
-import { metaEmailV2Router } from "./routes/metaEmailV2";
+import { metaEmailV2Router } from "./routes/metaEmailV2"; // Router con la lógica de proxy a Python
 import {
   generateEmailsV2Router,
   emailsV2Router,
@@ -26,23 +26,12 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // ===================== CORS ==========================
-// CORS_ORIGINS puede ser:
-// - undefined  → permite cualquier origen (true)  [útil en pruebas]
-// - "https://front.run.app"  → un solo origen
-// - "https://front.run.app,https://otro.run.app" → varios
-//
-// En producción, lo ideal es setear CORS_ORIGINS en Cloud Run con
-// el dominio del frontend, por ejemplo:
-//   https://email-studio-frontend-151554496273.europe-west1.run.app
-// y, si quieres, también los orígenes de dev:
-//   http://localhost:5173,http://localhost:8081
-//
 const allowedOriginsEnv = process.env.CORS_ORIGINS;
 
 const corsOptions = {
   origin: allowedOriginsEnv
     ? allowedOriginsEnv.split(",").map((s) => s.trim())
-    : true, // true = refleja cualquier origen (útil mientras afinamos)
+    : true, 
   credentials: false,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
@@ -50,7 +39,6 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-// Preflight para TODAS las rutas. Necesario para POST/PUT con JSON desde el navegador.
 app.options("*", cors(corsOptions));
 
 // ======================================================
@@ -69,7 +57,6 @@ app.get("/ready", (_req: Request, res: Response) => {
   res.json({ status: "ready" });
 });
 
-// Debug de entorno (solo para pruebas; en producción puedes quitarlo o protegerlo)
 app.get("/env-check", (_req: Request, res: Response) => {
   res.json({
     NODE_ENV: process.env.NODE_ENV,
@@ -88,42 +75,30 @@ app.get("/env-check", (_req: Request, res: Response) => {
 // 3. Rutas de API
 // ======================================================
 
-// Historial de lotes (lee directo desde GCS: emails_v2/<batchId>/batch.json)
+// Historial de lotes
 app.use("/api/history", historyRouter);
 
-// Meta Email 2.0 (campañas / clusters) – ruta principal usada por el frontend:
-// GET /api/email-v2/meta
-// GET /api/email-v2/meta2
-// GET /api/email-v2
-app.use("/api/email-v2", emailV2MetaRouter);
+// RUTA CRÍTICA: La que usa el hook de React sin el prefijo /api.
+// Corregimos el error 404: '/email-v2/meta' (singular)
+app.use("/email-v2/meta", metaEmailV2Router); 
 
-// Carga manual de imágenes para un batch:
-// POST /api/email-v2/batch/:batchId/images/manual-upload
+// Catálogo / Meta (Soportando todas las variantes que el hook podría usar):
+app.use("/api/email-v2/meta", metaEmailV2Router); // Preferida por convención
+app.use("/api/emails-v2", metaEmailV2Router); // Plural legacy
+
+// Carga manual de imágenes:
 app.use("/api/email-v2", emailV2ManualImageRouter);
 
-// Alias plural para compatibilidad:
-// GET /api/emails-v2/meta
-// GET /api/emails-v2/meta2
-// GET /api/emails-v2/
-app.use("/api/emails-v2", metaEmailV2Router);
-
 // Generación de Email 2.0 (texto + imágenes) y edición:
-// POST /api/generate-emails-v2
-// POST /api/generate-emails-v2/render-email-html
 app.use("/api/generate-emails-v2", generateEmailsV2Router);
 
-// PUT /api/emails-v2/:batchId  (guardar sets editados)
+// PUT /api/emails-v2/:batchId (guardar sets editados)
 app.use("/api/emails-v2", emailsV2Router);
 
 // Enlaces para JSON e imágenes ya generadas:
-// - GET /api/generated/emails_v2/:batchId/batch.json
-// - GET /generated/emails_v2/:batchId/batch.json
-// - GET /api/generated/emails_v2/:batchId/*
-// - GET /generated/emails_v2/:batchId/*
 app.use(generatedRouter);
 
-// Integración con SFMC (borradores de email):
-// POST /api/sfmc/draft-email
+// Integración con SFMC:
 app.use("/api/sfmc", sfmcRouter);
 
 // ======================================================
@@ -132,23 +107,20 @@ app.use("/api/sfmc", sfmcRouter);
 
 // 404 genérico
 app.use((req: Request, res: Response) => {
+  console.warn(`[404] Route not found: ${req.method} ${req.path}`);
   res.status(404).json({
     error: "Not Found",
     path: req.path,
   });
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error("🔥 Unhandled error in backend:", err);
 
   const status = err.status || 500;
   res.status(status).json({
     error: "Internal Server Error",
-    message:
-      process.env.NODE_ENV === "production"
-        ? "Unexpected error"
-        : String(err?.message || err),
+    message: err?.message || "Unexpected error",
   });
 });
 

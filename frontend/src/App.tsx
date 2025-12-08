@@ -1,3 +1,4 @@
+// frontend/src/App.tsx
 import React, { useState } from "react";
 import "./styles/index.css";
 import { toast } from "sonner";
@@ -12,7 +13,10 @@ import { ConfirmSendModal } from "@/components/ui/ConfirmSendModal";
 
 export default function App() {
   const batchState = useEmailBatchState();
-  const sfmcSender = useSfmcDraftSender();
+  
+  // AQUI EL CAMBIO: Extraemos sfmcSuccess (el objeto) en lugar de sfmcNotice
+  const { isUploading, sfmcSuccess, sendToSfmc } = useSfmcDraftSender();
+  
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const handleUploadClick = () => {
@@ -30,7 +34,7 @@ export default function App() {
       return;
     }
 
-    const success = await sfmcSender.sendToSfmc({
+    const success = await sendToSfmc({
       batchId: batchState.batchId,
       livePreview: batchState.livePreview,
       contentSets: batchState.contentSets,
@@ -59,7 +63,6 @@ export default function App() {
         "
       >
         {/* COL 1: SIDEBAR (Izquierda) */}
-        {/* 'pb-40' para asegurar que al expandir todo se pueda llegar al final con scroll */}
         <aside className="hidden lg:block h-full min-h-0 overflow-y-auto bg-white custom-scrollbar relative z-10">
           <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border-b border-slate-100 px-6 py-4 flex items-center justify-between shadow-sm">
             <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
@@ -75,7 +78,7 @@ export default function App() {
           </div>
         </aside>
 
-        {/* COL 2: WORKSPACE (Centro) */}
+        {/* COL 2: WORKSPACE (Centro) - SIN BOTONES */}
         <section className="h-full min-h-0 overflow-y-auto bg-slate-50/50 relative custom-scrollbar">
           <div className="max-w-[1600px] mx-auto min-h-full flex flex-col">
             <Email2Workspace
@@ -85,22 +88,23 @@ export default function App() {
               showInternalPreview={false}
               onPreviewChange={batchState.setLivePreview}
               onEditedChange={batchState.handleEditedChange}
+              onImagesChange={batchState.setImages} // Importante para actualizar imágenes manuales
             />
             {/* Espacio de seguridad para scroll */}
             <div className="h-32 shrink-0" />
           </div>
         </section>
 
-        {/* COL 3: PREVIEW (Derecha) */}
+        {/* COL 3: PREVIEW (Derecha) - CON BOTONES Y LINKS */}
         <div className="h-full min-h-0 overflow-y-auto bg-white custom-scrollbar">
           <PreviewPanel
             livePreview={batchState.livePreview}
             batchId={batchState.batchId}
             isSaving={batchState.isSaving}
-            isUploading={sfmcSender.isUploading}
+            isUploading={isUploading}
             lastSavedAt={batchState.lastSavedAt}
             savedVisible={batchState.savedVisible}
-            sfmcNotice={sfmcSender.sfmcNotice}
+            sfmcSuccess={sfmcSuccess} // Pasamos el objeto rico en datos
             onSave={batchState.saveEdits}
             onUploadClick={handleUploadClick}
           />
@@ -110,7 +114,7 @@ export default function App() {
       {/* Modal Global */}
       <ConfirmSendModal
         open={confirmOpen}
-        busy={sfmcSender.isUploading}
+        busy={isUploading}
         onClose={() => setConfirmOpen(false)}
         onConfirm={handleConfirmSend}
         preview={

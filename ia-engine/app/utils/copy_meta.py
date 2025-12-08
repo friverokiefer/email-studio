@@ -1,313 +1,190 @@
 # ia-engine/app/utils/copy_meta.py
 """
 Catálogo de copy para campañas y clusters del IA Engine.
-
-Centraliza:
-- BENEFITS: beneficios por campaña canónica.
-- CTAS: llamados a la acción por campaña canónica.
-- SUBJECTS: ejemplos de asuntos por campaña canónica.
-- CLUSTER_TONE: indicaciones de tono por cluster canónico.
-
-IMPORTANTE:
-- Las keys de campaña DEBEN alinearse con los nombres canónicos
-  de `CAMPAIGNS_TONE` (app.utils.campaigns).
-- Las keys de cluster DEBEN alinearse con `CLUSTERS` (app.utils.clusters).
+Centraliza BENEFITS, CTAS, SUBJECTS y CLUSTER_TONE.
+Alineado con Identidad V3.2 (High-End & Estructurada).
 """
 
 from typing import Any, Dict, List
 
-
 # ============================================================
-#  Beneficios por campaña (keys canónicas)
+#  BENEFICIOS (Inspiración para la narrativa)
+#  Redactados como "Valor para el cliente" manteniendo el dato duro.
 # ============================================================
-
 BENEFITS: Dict[str, List[str]] = {
     "Crédito de consumo - Persona": [
-        # Antes: "Crédito de Consumo BICE"
-        "tasa competitiva para clientes Banco BICE",
-        "cuotas y plazos flexibles según tu ingreso",
-        "proceso 100% online y sin papeleo excesivo",
-        "abono rápido del dinero en tu cuenta corriente",
-        "posibilidad de prepago parcial o total según condiciones vigentes",
-        # Antes: "Aumento línea de crédito"
-        "mayor flexibilidad para manejar imprevistos en el mes",
-        "alternativa para ordenar gastos de corto plazo",
-        "complemento a otros productos de financiamiento",
+        "Tasa preferencial exclusiva para clientes Banco BICE, reconociendo tu trayectoria.",
+        "Flexibilidad total: elige el plazo y el valor cuota que se adapten a tu flujo mensual.",
+        "Abono inmediato en tu cuenta corriente con un proceso 100% online y seguro.",
+        "Comienza a pagar después: hasta 3 meses de gracia para el primer vencimiento.",
+        "Libertad financiera: opción de prepago flexible para reducir deuda cuando quieras.",
+        "Liquidez ágil para concretar proyectos de alto valor sin tocar tus inversiones.",
+        "Orden y simplicidad: consolida tus compromisos en una sola entidad.",
     ],
     "Crédito de consumo - Empresa": [
-        "liquidez para gastos operativos y capital de trabajo",
-        "opción de financiar activos productivos y tecnología",
-        "plazos y montos ajustables según el flujo del negocio",
-        "evaluación especializada para empresas y emprendedores",
+        "Liquidez inmediata para asegurar la continuidad operacional y capital de trabajo.",
+        "Financiamiento estratégico para la renovación de activos productivos y tecnología.",
+        "Estructura de cuotas diseñada a la medida del ciclo de ingresos de tu negocio.",
+        "Evaluación experta realizada por un equipo especializado en empresas.",
+        "Respaldo financiero sólido para proyectos de expansión y crecimiento.",
     ],
     "DAP (Depósito a plazo)": [
-        # Antes: "DAP (Depósito a Plazo)"
-        "tasa fija conocida desde el inicio",
-        "plazos según tu horizonte de inversión",
-        "producto conservador y de bajo riesgo",
-        "renovación simple desde canales digitales",
-        # Guiño conservador para complementar un portafolio
-        "puede complementar otras alternativas de inversión como parte conservadora de tu portafolio",
+        "Rentabilidad asegurada con tasa fija conocida desde el día uno.",
+        "La tranquilidad de invertir con el respaldo patrimonial del Banco BICE.",
+        "Plazos a tu medida (desde 7 hasta 365 días) para una gestión eficiente de caja.",
+        "Gestión 100% digital: invierte, simula y renueva directamente desde tu App o Web.",
+        "El instrumento ideal para rentabilizar excedentes de liquidez sin riesgo de mercado.",
     ],
     "Crédito hipotecario": [
-        "tasas competitivas para clientes Banco BICE",
-        "financiamiento para primera vivienda o inversión",
-        "plazos largos para ordenar tu dividendo",
-        "asesoría especializada en cada etapa de la compra",
-        "opciones de portabilidad y refinanciamiento",
+        "Financiamiento a largo plazo con condiciones de tasa competitivas.",
+        "Asesoría personalizada de un especialista durante todo el proceso de compra.",
+        "Holgura inicial: hasta 6 meses de gracia para el pago del primer dividendo.",
+        "Flexibilidad total para financiar propiedades nuevas, usadas o fines generales.",
+        "Evaluación ágil para que no pierdas oportunidades de inversión inmobiliaria.",
     ],
     "Refinanciar deuda": [
-        # Antes: "Consolidación de deudas" + "Ordena tus deudas"
-        "posibilidad de bajar la cuota mensual total",
-        "unificar deudas en menos productos para simplificar el pago",
-        "ordenar el flujo de caja mes a mes",
-        "ajustar el plazo a tu capacidad de pago",
-        "acompañamiento para entender el nuevo esquema de pagos",
-        "unificar varios compromisos en una estructura más clara",
-        "reordenar plazos y montos para aliviar la carga mensual",
-        "tener una fecha de pago más predecible",
-        "reducir la probabilidad de atrasos y recargos",
+        "Orden financiero: unifica múltiples pasivos en una sola cuota más baja y manejable.",
+        "Mejora tu flujo de caja mensual reduciendo significativamente la carga financiera.",
+        "Accede a una tasa preferencial exclusiva para consolidación de deuda.",
+        "Posibilidad de extender el plazo para ganar mayor holgura mes a mes.",
+        "Recupera tu capacidad de ahorro y simplifica tu vida bancaria.",
     ],
     "Apertura producto - Tarjeta de crédito": [
-        # Antes: "Tarjeta de crédito"
-        "beneficios en comercios y programas de puntos",
-        "compras en cuotas en Chile y el extranjero",
-        "seguro asociado según producto contratado",
-        "gestión 100% digital de la tarjeta",
-        "herramientas para seguir y ordenar tus gastos",
-        # Antes: "Aumento cupo TC"
-        "mayor holgura para compras grandes o viajes",
-        "posibilidad de concentrar gastos en una tarjeta",
-        "acceso a más beneficios asociados a tu tarjeta",
+        "Acumulación acelerada de Dólares BICE en todas tus compras nacionales e internacionales.",
+        "Experiencia de viaje superior: acceso a Salones VIP en aeropuertos del mundo.",
+        "Viaja sin costos ocultos: 0% comisión en todas tus compras internacionales.",
+        "Protección total: seguros de viaje, protección de compra y garantía extendida incluidos.",
+        "Sin costo de mantención semestral (cumpliendo requisitos simples de uso).",
     ],
     "Apertura producto - Cuenta corriente": [
-        # Antes: "Cuenta corriente PyME" (adaptado a uso general)
-        "medios de pago para el día a día",
-        "acceso a canales digitales y servicios de recaudación",
-        "posibilidad de complementar con líneas de crédito y otros productos",
-        "facilita ordenar ingresos y gastos en una sola cuenta",
+        "La puerta de entrada a un modelo de atención preferente y personalizado.",
+        "Acceso exclusivo a productos de inversión y financiamiento selecto.",
+        "Plataforma digital premiada por su usabilidad, seguridad y diseño.",
+        "Beneficios únicos en gastronomía, viajes y experiencias lifestyle.",
+        "Tarjeta de Débito con tecnología avanzada y aceptación global.",
     ],
     "Seguros": [
-        # Antes: "Seguros"
-        "protección frente a eventos imprevistos",
-        "coberturas ajustables según tu necesidad",
-        "asistencia y soporte especializado",
-        "respaldo de Banco BICE y sus aliados",
-        # Antes: "Seguros de auto"
-        "protección del vehículo frente a accidentes y robos",
-        "asistencia en ruta y servicios complementarios",
-        "distintas coberturas para adaptarse a tu uso del auto",
-        # Antes: "Seguros de vida"
-        "protección económica para tu familia ante imprevistos",
-        "opciones de cobertura según etapa de vida",
-        "posibilidad de complementar con otros seguros",
+        "Coberturas integrales diseñadas para proteger tu patrimonio y estilo de vida.",
+        "Asistencia 24/7 con respuesta rápida en caso de siniestro o emergencia en ruta.",
+        "Contratación simple, transparente y 100% digital, sin letra chica.",
+        "Respaldo de las compañías aseguradoras más prestigiosas del mercado.",
+        "Primas preferenciales y beneficios exclusivos por ser cliente BICE.",
     ],
 }
 
-
 # ============================================================
-#  CTAs por campaña (keys canónicas)
+#  CTAs (Llamados a la acción - Imperativo suave)
 # ============================================================
-
 CTAS: Dict[str, List[str]] = {
     "Crédito de consumo - Persona": [
-        # Antes: "Crédito de Consumo BICE"
-        "Simular mi crédito",
-        "Ver mi oferta",
-        "Hablar con un ejecutivo",
-        # Antes: "Aumento línea de crédito"
-        "Solicitar evaluación",
-        "Ver alternativas",
+        "Simular mi crédito", "Ver mi oferta disponible", "Solicitar ahora", "Evaluar opciones",
     ],
     "Crédito de consumo - Empresa": [
-        "Solicitar evaluación para mi empresa",
-        "Hablar con un ejecutivo",
-        "Conocer alternativas de financiamiento",
+        "Evaluar financiamiento", "Contactar a mi ejecutivo", "Ver opciones", "Solicitar capital",
     ],
     "DAP (Depósito a plazo)": [
-        # Antes: "DAP (Depósito a Plazo)"
-        "Simular mi depósito",
-        "Ver tasas vigentes",
-        "Abrir depósito a plazo",
-        # Antes: "Fondos mutuos / Inversión" (adaptado)
-        "Conocer alternativas de inversión",
+        "Simular inversión", "Ver tasas de hoy", "Invertir ahora", "Rentabilizar mi dinero",
     ],
     "Crédito hipotecario": [
-        "Simular mi dividendo",
-        "Pedir asesoría hipotecaria",
-        "Conocer mi oferta",
+        "Simular dividendo", "Solicitar asesoría", "Ver propiedades", "Evaluar crédito",
     ],
     "Refinanciar deuda": [
-        # Antes: "Consolidación de deudas" + "Ordena tus deudas"
-        "Evaluar mi consolidación",
-        "Simular nueva cuota",
-        "Hablar con un ejecutivo",
-        "Ordenar mis deudas",
-        "Simular nueva estructura",
-        "Solicitar asesoría",
+        "Evaluar consolidación", "Ver mi nueva cuota", "Ordenar mis deudas", "Solicitar orden",
     ],
     "Apertura producto - Tarjeta de crédito": [
-        # Antes: "Tarjeta de crédito"
-        "Solicitar tarjeta",
-        "Conocer beneficios",
-        "Ver requisitos",
-        # Antes: "Aumento cupo TC"
-        "Pedir aumento de cupo",
-        "Evaluar mi tarjeta",
+        "Solicitar Tarjeta", "Ver beneficios", "Pedir online", "Quiero mi tarjeta",
     ],
     "Apertura producto - Cuenta corriente": [
-        # Antes: "Cuenta corriente PyME"
-        "Abrir cuenta corriente",
-        "Conocer requisitos",
-        "Agendar llamada",
+        "Hacerme cliente", "Abrir cuenta", "Conocer más", "Empezar ahora",
     ],
     "Seguros": [
-        # Antes: "Seguros"
-        "Cotizar seguro",
-        "Conocer coberturas",
-        "Hablar con ejecutivo",
-        # Antes: "Seguros de auto"
-        "Cotizar seguro de auto",
-        # Antes: "Seguros de vida"
-        "Cotizar seguro de vida",
-        "Calcular prima",
-        "Hablar con asesor",
+        "Cotizar seguro", "Ver coberturas", "Proteger ahora", "Contratar online",
     ],
 }
 
-
 # ============================================================
-#  Subjects de referencia por campaña (keys canónicas)
+#  SUBJECTS (Asuntos de correo - Estilo Inbox)
 # ============================================================
-
 SUBJECTS: Dict[str, List[str]] = {
     "Crédito de consumo - Persona": [
-        # Antes: "Crédito de Consumo BICE"
-        "Tu próximo proyecto, con un crédito a tu medida",
-        "Financia lo que necesitas con el Crédito de Consumo BICE",
-        "Haz realidad tus planes con cuotas claras y tasa competitiva",
-        "Tu crédito 100% online, en pocos pasos",
-        "Da el siguiente paso con un crédito pensado para ti",
-        # Antes: "Aumento línea de crédito"
-        "Evalúa aumentar tu línea de crédito",
-        "Más flexibilidad para tu día a día",
-        "Revisa alternativas para manejar tus imprevistos",
+        "Tus proyectos tienen luz verde 🟢",
+        "Una propuesta financiera pensada en ti",
+        "¿Planes en mente? Hazlos realidad hoy",
+        "Revisa tu oferta preferencial de consumo",
+        "Financia eso que tanto quieres",
     ],
     "Crédito de consumo - Empresa": [
-        "Financiamiento para las necesidades de tu empresa",
-        "Evalúa un crédito para el día a día de tu negocio",
-        "Haz crecer tu empresa con apoyo financiero BICE",
+        "El impulso que tu negocio necesita",
+        "Liquidez ágil para tus desafíos operativos",
+        "Financiamiento estratégico para tu empresa",
+        "Respaldo BICE para tu crecimiento",
     ],
     "DAP (Depósito a plazo)": [
-        # Antes: "DAP (Depósito a Plazo)" + "Fondos mutuos / Inversión" (adaptado)
-        "Haz que tu ahorro trabaje con una tasa conocida",
-        "Evalúa un Depósito a Plazo para tus excedentes",
-        "Una alternativa conservadora para tu dinero",
-        "Da el siguiente paso en tus inversiones",
-        "Evalúa alternativas de inversión con Banco BICE",
-        "Diversifica tu ahorro con una solución conservadora",
+        "Haz crecer tus ahorros con seguridad",
+        "Tu dinero puede rentar más: revisa nuestras tasas",
+        "Invierte con la tranquilidad del Banco BICE",
+        "Una decisión inteligente para tu capital",
     ],
     "Crédito hipotecario": [
-        "Da el siguiente paso hacia tu nueva vivienda",
-        "Evalúa tu crédito hipotecario con Banco BICE",
-        "Tu próxima propiedad, con asesoría especializada",
+        "El camino a tu nueva casa comienza aquí",
+        "Tu propiedad soñada, financiada a tu medida",
+        "Asesoría experta para tu inversión inmobiliaria",
+        "Hablemos de tu próximo hogar",
     ],
     "Refinanciar deuda": [
-        # Antes: "Consolidación de deudas" + "Ordena tus deudas"
-        "Evalúa unificar tus deudas en una sola cuota",
-        "Menos estrés: una cuota, mejores condiciones",
-        "Ordena tus deudas y alivia tu mes",
-        "Revisa si puedes mejorar tu carga financiera",
-        "Es momento de ordenar tus deudas",
-        "Revisa una forma más simple de pagar mes a mes",
-        "Un solo plan de pago para tus deudas actuales",
-        "Evalúa un nuevo esquema de cuotas para tu tranquilidad",
+        "Recupera tu tranquilidad financiera",
+        "Ordena tus compromisos en una sola cuota",
+        "Mejora tu flujo de caja este mes",
+        "Una solución para ordenar tus pasivos",
     ],
     "Apertura producto - Tarjeta de crédito": [
-        # Antes: "Tarjeta de crédito" + "Aumento cupo TC"
-        "Conoce los beneficios de tu tarjeta BICE",
-        "Evalúa una tarjeta pensada para tu estilo de vida",
-        "Organiza tus compras con una tarjeta a tu medida",
-        "Evalúa aumentar el cupo de tu tarjeta",
-        "Más espacio para tus planes con tu tarjeta BICE",
-        "Revisa si puedes ampliar tu cupo hoy",
+        "Bienvenido a un mundo de beneficios exclusivos",
+        "Viaja y compra mejor con tu Tarjeta BICE",
+        "Descubre el poder de tus Dólares BICE",
+        "La tarjeta que acompaña tu estilo de vida",
     ],
     "Apertura producto - Cuenta corriente": [
-        # Antes: "Cuenta corriente PyME" (adaptado)
-        "Ordena tus finanzas con una cuenta corriente en Banco BICE",
-        "Evalúa una cuenta pensada para tu día a día",
-        "Soluciones bancarias para tu actividad financiera",
+        "La experiencia bancaria que mereces",
+        "Bienvenido a Banco BICE: comencemos",
+        "Simplifica tu vida financiera con nosotros",
+        "Un banco a la altura de tus expectativas",
     ],
     "Seguros": [
-        # Antes: "Seguros" + "Seguros de auto" + "Seguros de vida"
-        "Revisa cómo proteger lo que más valoras",
-        "Evalúa tus coberturas de seguros con Banco BICE",
-        "Protección y tranquilidad para ti y tu familia",
-        "Protege tu auto con un seguro a tu medida",
-        "Evalúa un seguro para tu vehículo",
-        "Más tranquilidad cada vez que manejes",
-        "Piensa hoy en la protección de tu familia",
-        "Evalúa un seguro de vida según tu etapa",
-        "Un plan de protección pensado para quienes más quieres",
+        "Protege lo que más quieres hoy",
+        "Tranquilidad para ti y tu familia",
+        "Tu auto y hogar, en las mejores manos",
+        "Cobertura total para tu tranquilidad",
     ],
 }
 
-
 # ============================================================
-#  Tono por cluster (canon: CLUSTERS de app.utils.clusters)
+#  TONO POR CLUSTER (Contexto emocional para el System Prompt)
 # ============================================================
-
 CLUSTER_TONE: Dict[str, str] = {
-    # Clusters de Crédito de consumo - Persona
-    "Auto familiar": (
-        "Destaca seguridad, comodidad y espacio para la familia al renovar el auto."
-    ),
-    "Auto soltero": (
-        "Tono aspiracional; enfócate en estilo de vida, independencia y libertad."
-    ),
-    "Cambio de moto": (
-        "Resalta movilidad ágil, economía y mejora respecto al vehículo actual."
-    ),
-    "Mejora del hogar": (
-        "Conecta con ideas de renovación, confort y valorización de la vivienda."
-    ),
-    "Proyectos familiares": (
-        "Enfoca en bienestar del grupo familiar, estudios, salud y experiencias compartidas."
-    ),
-    "Proyectos personales": (
-        "Habla de desarrollo personal, estudios, hobbies y cambios de vida."
-    ),
-    "Reorganizar finanzas joven": (
-        "Tono empático y sin juicio; foco en alivio de carga mensual y orden financiero."
-    ),
-    "Reorganizar finanzas senior": (
-        "Tono claro y respetuoso; prioriza estabilidad, simplicidad y tranquilidad."
-    ),
-    "Viajes familiares": (
-        "Invita a vivir experiencias en familia, planificar con anticipación y viajar tranquilos."
-    ),
-    "Viajes solteros": (
-        "Tono más lúdico y motivador; habla de destinos, experiencias intensas y flexibilidad."
-    ),
+    # --- Persona ---
+    "Auto familiar": "Destaca seguridad, comodidad y espacio para la familia al renovar el auto. Tono protector y de bienestar.",
+    "Auto soltero": "Tono aspiracional; enfócate en estilo de vida, independencia y libertad de movimiento.",
+    "Cambio de moto": "Resalta movilidad ágil, economía, libertad y un upgrade tecnológico.",
+    "Mejora del hogar": "Conecta con ideas de renovación, confort, estética y valorización del espacio personal.",
+    "Proyectos familiares": "Enfoca en bienestar del grupo familiar, hitos de vida (estudios, salud) y respaldo sólido.",
+    "Proyectos personales": "Habla de desarrollo personal, estudios, hobbies y la satisfacción de cumplir metas propias.",
+    "Reorganizar finanzas joven": "Tono empático, sin juicio; foco en alivio de carga, orden y futuro despejado.",
+    "Reorganizar finanzas senior": "Tono claro, respetuoso y sereno; prioriza estabilidad, simplicidad y protección patrimonial.",
+    "Viajes familiares": "Invita a vivir experiencias memorables en familia, planificar con anticipación y viajar tranquilos.",
+    "Viajes solteros": "Tono más lúdico, aventurero y exclusivo; habla de destinos, experiencias y flexibilidad.",
+
+    # --- Nuevos Clusters Cuenta Corriente ---
+    "Cuenta digital GO BICE": "Tono fresco, ágil y 'mobile-first'. Enfatiza la libertad, la rapidez del onboarding y la pertenencia a un banco top sin burocracia.",
+    "Cuenta corriente Universitaria": "Tono joven, de apoyo y bienvenida al mundo financiero. Destaca la gratuidad y los beneficios en tecnología y tiempo libre.",
+
+    # --- Empresa ---
+    "Liquidez Operativa": "Tono resolutivo y ágil. Enfocado en velocidad de respuesta, no detener la operación y eficiencia de caja.",
+    "Inversión para Crecer": "Tono visionario y de partnership. Habla de competitividad, modernización y futuro del negocio.",
+    "Reordenamiento Financiero": "Tono estratégico y experto. Enfocado en salud financiera, sostenibilidad y estructura inteligente.",
 }
 
 
-# ============================================================
-#  Helper de export
-# ============================================================
-
 def get_copy_meta() -> Dict[str, Any]:
-    """
-    Devuelve un diccionario con los catálogos de copy.
-
-    Estructura:
-        {
-          "benefits": { campaign: [..] },
-          "ctas": { campaign: [..] },
-          "subjects": { campaign: [..] },
-          "clusterTone": { cluster: "..." }
-        }
-    """
     return {
         "benefits": BENEFITS,
         "ctas": CTAS,

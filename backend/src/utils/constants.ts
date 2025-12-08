@@ -1,19 +1,8 @@
 // backend/src/utils/constants.ts
 
 /** =========================
- *  Catálogos principales
- *  ========================= */
-/**
- * Campañas oficiales que puede seleccionar el usuario.
- *
- * IMPORTANTE:
- * - Estos textos deben coincidir EXACTAMENTE con:
- *     ia-engine/app/utils/campaigns.py::CAMPAIGNS_TONE.keys()
- * - También deben coincidir con lo que envía el frontend.
- *
- * El IA Engine (Python) es la fuente de verdad de tono/beneficios/CTAs;
- * este archivo actúa como espejo tipado en Node para validaciones y legacy.
- */
+ * Catálogos principales
+ * ========================= */
 export const CAMPAIGNS = [
   "Crédito de consumo - Persona",
   "Crédito de consumo - Empresa",
@@ -27,17 +16,7 @@ export const CAMPAIGNS = [
 
 export type Campaign = (typeof CAMPAIGNS)[number];
 
-/**
- * Drivers / clusters oficiales asignados por campaña.
- *
- * Deben reflejar:
- *   ia-engine/app/utils/clusters.py::CAMPAIGN_CLUSTERS
- *
- * El front nuevo debería tomar catálogos desde /ia/meta,
- * pero este mapa se mantiene para:
- *   - validaciones backend
- *   - compatibilidad con flujos antiguos
- */
+// --- Definición de Arrays de Clusters ---
 
 const CONSUMO_PERSONA_CLUSTERS = [
   "Auto familiar",
@@ -52,12 +31,11 @@ const CONSUMO_PERSONA_CLUSTERS = [
   "Viajes solteros",
 ] as const;
 
+// ACTUALIZADO: Nuevos Clusters Empresa
 const CONSUMO_EMPRESA_CLUSTERS = [
-  "Capital de trabajo",
-  "Inversión en activos",
-  "Ordenar pasivos empresa",
-  "Expansión del negocio",
-  "Capital para impuestos",
+  "Liquidez Operativa",
+  "Inversión para Crecer",
+  "Reordenamiento Financiero",
 ] as const;
 
 const DAP_CLUSTERS = [
@@ -82,8 +60,10 @@ const REFINANCIAR_DEUDA_CLUSTERS = [
   "Ordenar líneas y sobregiros",
 ] as const;
 
+// ACTUALIZADO: Nuevos Clusters Cuenta Corriente
 const CC_CLUSTERS = [
-  "Cuenta sueldo",
+  "Cuenta digital GO BICE",
+  "Cuenta corriente Universitaria",
   "Cuenta para PyME",
   "Cuenta alta renta",
   "Cuenta para profesional independiente",
@@ -116,8 +96,7 @@ export const CAMPAIGN_CLUSTERS: Record<Campaign, string[]> = {
 };
 
 /**
- * Lista plana de clusters posibles. Derivada de CAMPAIGN_CLUSTERS.
- * Debe coincidir con ia-engine/app/utils/clusters.py::CLUSTERS.keys()
+ * Lista plana de clusters posibles.
  */
 export const CLUSTERS: string[] = Array.from(
   new Set<string>(Object.values(CAMPAIGN_CLUSTERS).flat()),
@@ -125,21 +104,12 @@ export const CLUSTERS: string[] = Array.from(
 
 export type Cluster = (typeof CLUSTERS)[number];
 
-/** =========================
- *  Helpers de segmentación (legacy-safe)
- *  ========================= */
+// --- Helpers Legacy ---
 
-/**
- * Devuelve los clusters válidos para una campaña.
- * Útil para validaciones y para flujos antiguos.
- */
 export function getClustersForCampaign(campaign: Campaign): string[] {
   return CAMPAIGN_CLUSTERS[campaign] ?? [];
 }
 
-/**
- * Devuelve las campañas donde aparece un cluster dado.
- */
 export function getCampaignsForCluster(cluster: string): Campaign[] {
   const value = String(cluster);
   return (CAMPAIGNS as readonly Campaign[]).filter((c) =>
@@ -147,11 +117,6 @@ export function getCampaignsForCluster(cluster: string): Campaign[] {
   );
 }
 
-/**
- * Subjects genéricos de fallback (solo para motores antiguos).
- * En Email V2 el texto lo genera el IA Engine, pero se dejan
- * estos ejemplos para posibles flows legacy.
- */
 export function genericSubjectsFor(campaign: Campaign) {
   return [
     `${campaign}: solución a tu medida`,

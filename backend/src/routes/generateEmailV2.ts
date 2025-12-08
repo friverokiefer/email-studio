@@ -31,6 +31,7 @@ export type EmailContentSet = {
   cta?: string;
 };
 
+// Tipado alineado con la respuesta estricta de image.ts
 export type EmailV2Image = {
   fileName: string;
   heroUrl: string; // URL directa (storage.googleapis.com + cache-busting)
@@ -38,9 +39,10 @@ export type EmailV2Image = {
     model?: string;
     size?: string; // valor solicitado al modelo
     quality?: string;
-    width?: number; // dimensión real del JPG final (post-normalización)
-    height?: number; // dimensión real del JPG final (post-normalización)
+    width?: number; // dimensión real del JPG final
+    height?: number; // dimensión real del JPG final
     sizeNormalized?: string; // p.ej. "1792x1024"
+    fallback?: boolean;
   };
 };
 
@@ -288,16 +290,18 @@ generateEmailsV2Router.post("/", async (req, res) => {
         }
       : undefined;
 
-    /* 1) IMÁGENES (normalizadas COVER 16:9) */
+    /* 1) IMÁGENES (normalizadas COVER 16:9, gpt-image-1, High Quality) */
     const imagesOut: EmailV2Image[] = [];
 
-    // IMPORTANTE: tmp ahora es backend/tmp/generated/<batchId>, no backend/backend/tmp
+    // IMPORTANTE: tmp ahora es backend/tmp/generated/<batchId>
     const tmpOutDir = path.resolve(process.cwd(), "tmp", "generated", batchId);
     await fs.mkdir(tmpOutDir, { recursive: true });
 
     for (let i = 0; i < imageCount; i++) {
       const t0 = Date.now();
       console.log(`[emails_v2] generating image ${i + 1}/${imageCount}…`);
+      
+      // Llamada al nuevo servicio estricto
       const img = await generateHeroPNG({
         campaign,
         cluster,
@@ -306,6 +310,7 @@ generateEmailsV2Router.post("/", async (req, res) => {
         promptHint: normalizedFeedback?.bodyContent || undefined,
         mode: "cover",
       });
+      
       const t1 = Date.now();
       console.log(
         `[emails_v2] image ${i + 1}/${imageCount} ready in ${t1 - t0}ms`,
@@ -326,24 +331,19 @@ generateEmailsV2Router.post("/", async (req, res) => {
       await uploadBuffer(key, buf, "image/jpeg", true);
 
       const heroDirect = gcsDirectUrl(key, batchId); // cache-busting
+      
       imagesOut.push({
         fileName: img.fileName,
         heroUrl: heroDirect,
-        meta: img?.meta
-          ? {
-              model: (img.meta as any).model,
-              size: (img.meta as any).size
-                ? String((img.meta as any).size)
-                : undefined,
-              quality: (img.meta as any).quality,
-              width: (img.meta as any).width,
-              height: (img.meta as any).height,
-              sizeNormalized:
-                (img.meta as any).width && (img.meta as any).height
-                  ? `${(img.meta as any).width}x${(img.meta as any).height}`
-                  : undefined,
-            }
-          : undefined,
+        meta: {
+          model: img.meta.model,
+          size: img.meta.size,
+          quality: img.meta.quality,
+          width: img.meta.width,
+          height: img.meta.height,
+          sizeNormalized: img.meta.sizeNormalized,
+          fallback: img.meta.fallback
+        },
       });
     }
 
@@ -352,6 +352,7 @@ generateEmailsV2Router.post("/", async (req, res) => {
       images: imagesOut.map((x) => ({
         fileName: x.fileName,
         size: x.meta?.size,
+        quality: x.meta?.quality,
         sizeNormalized: x.meta?.sizeNormalized,
       })),
     });
@@ -470,6 +471,7 @@ generateEmailsV2Router.post("/", async (req, res) => {
         fileName: x.fileName,
         sizeDeclared: x.meta?.size,
         sizeNormalized: x.meta?.sizeNormalized,
+        quality: x.meta?.quality,
       })),
     });
 

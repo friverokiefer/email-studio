@@ -1,13 +1,41 @@
 // frontend/src/lib/schemas.ts
 
-/**
- * Tipos genéricos de campos y schemas.
- * Hoy no se usan en Email 2.0, pero se dejan por si en el futuro
- * se modelan formularios adicionales en el frontend.
- */
-
 import type { SfmcDraftEmailPayload } from "./apiEmailV2";
 
+/**
+ * ==================== Metadata del IA Engine ====================
+ * Tipos para el catálogo dinámico de campañas y clusters.
+ */
+export interface CampaignOption {
+  id: string;
+  label: string;
+  description?: string;
+}
+
+export interface ClusterOption {
+  id: string;
+  label: string;
+  description?: string;
+  tone_hint?: string;
+}
+
+export interface MetaData {
+  // Los marcamos como opcionales (?) para que el frontend no explote
+  // si el backend omite alguna llave o envía null.
+  campaigns?: CampaignOption[];
+  clusters?: ClusterOption[];
+  mapping?: Record<string, string[]>; // campaña_id -> lista de cluster_ids
+  defaults?: { 
+    benefits: Record<string, string[]>;
+    ctas: Record<string, string[]>;
+    subjects: Record<string, string[]>;
+    clusterTone: Record<string, string>;
+  };
+}
+
+/**
+ * Tipos genéricos de campos (Se mantienen sin cambios)
+ */
 export type Field =
   | {
       id: string;
@@ -49,7 +77,7 @@ export type Field =
     };
 
 export type Schema = {
-  id: string; // antes era "google_ads" | "meta_ads" | ...
+  id: string;
   title: string;
   fields: Field[];
   image_formats?: any[];
@@ -57,15 +85,8 @@ export type Schema = {
 };
 
 /**
- * ==================== Validador SFMC payload ====================
- *
- * Esto SÍ se usa para el flujo de correo:
- * - Enviar imagen + HTML a Salesforce Marketing Cloud
- * - Validar que el backend recibe un payload consistente
- *
- * El contrato (tipos) vive en apiEmailV2.ts → SfmcDraftEmailPayload.
+ * ==================== Validador SFMC payload (Se mantiene sin cambios) ====================
  */
-
 export function validateSfmcDraftEmailPayload(
   p: SfmcDraftEmailPayload | any
 ): { ok: boolean; errors: string[] } {

@@ -1,7 +1,10 @@
+// frontend/src/hooks/useSidebarForm.ts
 import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
-import { getEmailV2Meta, type EmailV2Meta } from "@/lib/apiEmailV2";
+// NOTA: No importamos fetchJson para hacer el bypass y depurar a bajo nivel
+// import { fetchJson } from "@/lib/api"; 
 import { loadFormState, saveFormState } from "@/lib/storage";
+import type { MetaData, CampaignOption, ClusterOption } from "@/lib/schemas";
 
 export type Email2SidebarState = {
   campaign: string;
@@ -26,7 +29,7 @@ export function useSidebarForm() {
     imageCount: 2,
   });
 
-  const [meta, setMeta] = useState<EmailV2Meta | null>(null);
+  const [meta, setMeta] = useState<MetaData | null>(null);
   const [metaLoading, setMetaLoading] = useState<boolean>(false);
   const [metaError, setMetaError] = useState<string | null>(null);
 
@@ -35,66 +38,135 @@ export function useSidebarForm() {
     try {
       const stored = loadFormState<Email2SidebarState>(FORM_TYPE);
       if (stored) {
-        // Asegurar rangos válidos (1-5)
-        if (typeof stored.setCount === "number") stored.setCount = Math.max(1, Math.min(5, stored.setCount));
-        if (typeof stored.imageCount === "number") stored.imageCount = Math.max(1, Math.min(5, stored.imageCount));
+        if (typeof stored.setCount === "number")
+          stored.setCount = Math.max(1, Math.min(5, stored.setCount));
+        if (typeof stored.imageCount === "number")
+          stored.imageCount = Math.max(1, Math.min(5, stored.imageCount));
         setState((prev) => ({ ...prev, ...stored }));
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
-  // 2. Guardar cambios automáticamente (con debounce)
+  // 2. Guardar cambios automáticamente
   useEffect(() => {
     const id = window.setTimeout(() => {
-      try { saveFormState(FORM_TYPE, state); } catch { /* ignore */ }
+      try {
+        saveFormState(FORM_TYPE, state);
+      } catch {
+        /* ignore */
+      }
     }, 500);
     return () => clearTimeout(id);
   }, [state]);
 
-  // 3. Cargar Catálogo desde IA Engine
+  // 3. Cargar Catálogo (BYPASS MANUAL: Fetch Nativo + Cache Buster)
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+
+    const loadMetaBypassingApi = async () => {
+      setMetaLoading(true);
+      
+      // TRUCO: Usamos /api explícito basado en tus curls exitosos.
+      // Añadimos 'nocache' con timestamp para forzar status 200 y evitar el 304.
+      const endpoint = "/api/email-v2/meta"; 
+      const url = `${endpoint}?nocache=${Date.now()}`;
+
+      console.log(`🚀 [useSidebarForm] Iniciando Fetch Nativo a: ${url}`);
+
       try {
-        setMetaLoading(true);
-        const data = await getEmailV2Meta();
-        if (!cancelled) {
-          setMeta(data);
-          setMetaError(null);
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
         }
-      } catch (e) {
-        console.error("Error meta:", e);
+
+        const rawData = await response.json();
+
         if (!cancelled) {
-          setMetaError("Error cargando catálogo.");
-          toast.error("No se pudo cargar el catálogo de campañas.");
+          // === ZONA DE DIAGNÓSTICO Y NORMALIZACIÓN ===
+          console.group("✅ [useSidebarForm] RESPUESTA RECIBIDA");
+          console.log("Raw Payload:", rawData);
+
+          let cleanData: MetaData = { campaigns: [], clusters: [], mapping: {} };
+
+          // Detector de estructura
+          if (rawData && Array.isArray(rawData.campaigns)) {
+            console.log("-> Estructura Directa detectada.");
+            cleanData = rawData;
+          } else if (rawData && rawData.data && Array.isArray(rawData.data.campaigns)) {
+            console.log("-> Estructura 'data' Wrapper detectada.");
+            cleanData = rawData.data;
+          } else if (rawData && rawData.payload && Array.isArray(rawData.payload.campaigns)) {
+             console.log("-> Estructura 'payload' Wrapper detectada.");
+             cleanData = rawData.payload;
+          } else {
+             console.error("❌ Estructura desconocida o vacía:", rawData);
+          }
+          console.groupEnd();
+
+          // Guardamos data
+          setMeta(cleanData);
+
+          // Verificación final para UI
+          if (!cleanData.campaigns || cleanData.campaigns.length === 0) {
+            setMetaError("Se recibieron datos pero la lista de campañas está vacía.");
+          } else {
+            setMetaError(null);
+          }
+        }
+
+      } catch (e: any) {
+        console.error("💥 [useSidebarForm] Error Fatal en Fetch:", e);
+        if (!cancelled) {
+          // Fallback: Si falla con /api, intenta sin /api (por si el proxy vite es distinto)
+          if (url.includes("/api/")) {
+             console.log("🔄 Reintentando sin prefijo /api ...");
+             // Podríamos reintentar aquí, pero mejor mostramos el error para depurar.
+          }
+          setMetaError("Error conectando al servidor IA.");
+          toast.error("Error cargando metadatos.");
         }
       } finally {
         if (!cancelled) setMetaLoading(false);
       }
-    })();
-    return () => { cancelled = true; };
+    };
+
+    loadMetaBypassingApi();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // 4. VALIDACIÓN ESTRICTA: Si la campaña guardada ya no existe, resetearla.
+  // 4. Validación defensiva: Limpiar selección inválida
   useEffect(() => {
-    if (!meta) return;
-    
-    const validCampaigns = meta.campaigns ?? [];
-    
+    // Si no hay campañas cargadas, no hacemos nada
+    if (!meta?.campaigns || !Array.isArray(meta.campaigns)) return;
+
     setState((prev) => {
-      // A. Validar Campaña
       let nextCamp = prev.campaign;
-      if (nextCamp && !validCampaigns.includes(nextCamp)) {
-        // Campaña no existe en el catálogo actual -> Reset
-        nextCamp = ""; 
+
+      // A. Validar Campaña
+      const campExists = meta.campaigns?.some((c) => c.id === nextCamp);
+      
+      if (nextCamp && !campExists) {
+        nextCamp = "";
       }
 
-      // B. Validar Cluster (debe pertenecer a la campaña)
+      // B. Validar Cluster
       let nextClust = prev.cluster;
       if (nextCamp) {
-        const validClusters = meta.campaignClusters?.[nextCamp] ?? [];
-        if (nextClust && !validClusters.includes(nextClust)) {
-           nextClust = "";
+        const allowedIds = meta.mapping?.[nextCamp] || [];
+        if (allowedIds.length > 0 && nextClust && !allowedIds.includes(nextClust)) {
+          nextClust = "";
         }
       } else {
         nextClust = "";
@@ -105,10 +177,22 @@ export function useSidebarForm() {
     });
   }, [meta]);
 
-  const availableCampaigns = useMemo(() => meta?.campaigns ?? [], [meta]);
-  const availableClusters = useMemo(() => {
-    if (!state.campaign || !meta) return [];
-    return meta.campaignClusters?.[state.campaign] ?? [];
+  // 5. Helpers UI
+  const availableCampaigns: CampaignOption[] = useMemo(() => {
+    if (!meta?.campaigns || !Array.isArray(meta.campaigns)) return [];
+    return meta.campaigns;
+  }, [meta]);
+
+  const availableClusters: ClusterOption[] = useMemo(() => {
+    if (!state.campaign || !meta?.clusters || !Array.isArray(meta.clusters)) return [];
+
+    const allowedIds = meta.mapping?.[state.campaign];
+
+    if (Array.isArray(allowedIds) && allowedIds.length > 0) {
+      return meta.clusters.filter((c) => allowedIds.includes(c.id));
+    }
+
+    return [];
   }, [state.campaign, meta]);
 
   return {

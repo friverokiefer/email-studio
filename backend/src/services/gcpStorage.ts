@@ -20,7 +20,16 @@ const {
 const localKeyPath = path.resolve(process.cwd(), ".secrets", "service-account.json");
 const hasLocalKey = fs.existsSync(localKeyPath);
 
-const storageOptions: any = {};
+const storageOptions: any = {
+  // Configuración de reintento para redes inestables (local)
+  retryOptions: {
+    autoRetry: true,
+    retryDelayMultiplier: 2,
+    totalTimeoutSeconds: 60,
+    maxRetryDelay: 60,
+    maxRetries: 3,
+  }
+};
 
 if (hasLocalKey) {
   // Entorno LOCAL: usamos archivo

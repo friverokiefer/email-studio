@@ -13,197 +13,185 @@ from typing import Dict, List, Optional
 
 from app.utils.campaigns import normalize_campaign
 
-# Descripción base por cluster (independiente de campaña).
-# Importante: los nombres deben coincidir con backend/src/utils/constants.ts::CLUSTERS
+# ============================================================
+# 1. DEFINICIONES BASE DE CLUSTERS (El "Qué")
+# ============================================================
 CLUSTERS: Dict[str, str] = {
-    # Crédito de consumo - Persona
+    # --- Crédito de consumo - Persona ---
     "Auto familiar": (
-        "Clientes que están evaluando cambiar o comprar un auto para uso familiar. "
-        "Valoran seguridad, espacio, comodidad y confiabilidad en el vehículo, "
-        "buscando proteger y facilitar la vida diaria de su grupo familiar."
+        "Clientes de alto patrimonio evaluando renovar el auto familiar por un modelo SUV o de alta gama. "
+        "Priorizan la seguridad absoluta de sus hijos y el confort para viajes largos. Buscan calidad sin compromisos."
     ),
     "Auto soltero": (
-        "Clientes solteros que quieren cambiar o comprar un auto para uso personal. "
-        "Buscan estilo, independencia y libertad de movimiento, sin exceso de estridencia, "
-        "manteniendo un tono aspiracional pero sobrio."
+        "Profesionales exitosos que buscan un auto que refleje su estilo de vida y logros. "
+        "Valoran el diseño, la tecnología y la experiencia de conducción. Tono aspiracional y moderno."
     ),
     "Cambio de moto": (
-        "Clientes que actualmente usan moto y están evaluando renovarla o cambiarla. "
-        "Valoran movilidad ágil, economía en combustible y mejoras de seguridad y tecnología."
+        "Aficionados al motociclismo o usuarios de movilidad eficiente que buscan renovar su equipo "
+        "por modelos de mayor cilindrada o tecnología. Valoran la libertad y la agilidad."
     ),
     "Mejora del hogar": (
-        "Clientes que desean remodelar, ampliar o mejorar su vivienda actual. "
-        "Buscan más confort, mejor distribución o valorizar la propiedad, "
-        "con foco en proyectos concretos (cocina, terraza, home office, etc.)."
+        "Clientes que invierten en valorizar su propiedad o crear espacios de disfrute (quincho, piscina, terraza). "
+        "Buscan estética, confort y disfrute familiar en casa."
     ),
     "Proyectos familiares": (
-        "Clientes que evalúan tomar un crédito para proyectos asociados a la familia: "
-        "educación, salud, cambios de vivienda, experiencias compartidas, entre otros."
+        "Familias que invierten en hitos importantes: educación internacional, bodas, salud de excelencia "
+        "o grandes viajes. Priorizan el bienestar y las experiencias memorables sobre el costo."
     ),
     "Proyectos personales": (
-        "Clientes que planean usar el crédito para metas individuales: estudios, postgrados, "
-        "cursos, emprendimientos personales, hobbies o cambios de estilo de vida."
+        "Clientes enfocados en su autorealización: postgrados en el extranjero, hobbies costosos o emprendimientos personales. "
+        "Buscan un socio financiero que impulse sus metas."
     ),
     "Reorganizar finanzas joven": (
-        "Clientes de perfil más joven, con varias deudas o productos de crédito activos, "
-        "que necesitan ordenar pagos, consolidar y bajar su carga mensual."
+        "Profesionales jóvenes con altos ingresos pero con desorden financiero temporal. "
+        "Buscan simplificar su vida, ordenar sus flujos y recuperar capacidad de ahorro/inversión."
     ),
     "Reorganizar finanzas senior": (
-        "Clientes de mayor edad con deudas dispersas o estructuras de pago complejas, "
-        "que buscan simplificar, ganar estabilidad y planificar mejor su flujo de caja."
+        "Clientes consolidados que buscan optimizar su estructura patrimonial y simplificar la gestión de sus pasivos. "
+        "Valoran la claridad, el respeto y la eficiencia."
     ),
     "Viajes familiares": (
-        "Clientes que planifican viajes en familia, dentro o fuera de Chile. "
-        "Valoran seguridad, anticipación, comodidad y poder financiar parte del viaje "
-        "sin desordenar completamente sus finanzas."
+        "Familias planificando vacaciones premium (All inclusive, Disney, Europa). "
+        "Quieren resolver el financiamiento rápido para enfocarse solo en disfrutar y crear recuerdos."
     ),
     "Viajes solteros": (
-        "Clientes que planifican viajes individuales o con amistades, normalmente con destinos "
-        "más juveniles o experiencias intensas. Buscan flexibilidad y aprovechar la oportunidad "
-        "sin sobredimensionar el riesgo financiero."
+        "Viajeros frecuentes que buscan destinos exóticos o experiencias exclusivas con amigos. "
+        "Valoran la flexibilidad y tener liquidez para aprovechar oportunidades en el destino."
     ),
 
-    # Crédito de consumo - Empresa
-    "Capital de trabajo": (
-        "Empresas o emprendedores que requieren liquidez para gastos operativos: pago a proveedores, "
-        "sueldos, stock, entre otros. El foco está en continuidad del negocio y estabilidad de caja."
+    # --- Crédito de consumo - Empresa ---
+    "Liquidez Operativa": (
+        "Empresas que necesitan caja rápida para mantener la operación sin interrupciones: "
+        "pago de proveedores, nómina, estacionalidad, o pagos de impuestos sin afectar la liquidez diaria."
     ),
-    "Inversión en activos": (
-        "Empresas que buscan financiar la compra o renovación de activos productivos: maquinaria, "
-        "tecnología, infraestructura o flota. El mensaje debe vincular el crédito con crecimiento "
-        "y eficiencia del negocio."
+    "Inversión para Crecer": (
+        "Empresas que modernizan activos, renuevan maquinaria o abren nuevas líneas de negocio. "
+        "El crédito se presenta como una palanca estratégica para la expansión y eficiencia."
     ),
-    "Ordenar pasivos empresa": (
-        "Empresas con varias deudas o líneas de crédito dispersas que quieren simplificar su "
-        "estructura de pasivos, mejorando plazos, tasas o visibilidad del endeudamiento."
-    ),
-    "Expansión del negocio": (
-        "Empresas que planean abrir nuevas sucursales, expandirse a nuevas ciudades/países o "
-        "incorporar nuevas líneas de negocio. El crédito se presenta como apoyo al crecimiento."
-    ),
-    "Capital para impuestos": (
-        "Empresas que necesitan liquidez puntual para cumplir obligaciones tributarias, "
-        "evitando tensiones de caja y manteniendo orden en sus finanzas."
+    "Reordenamiento Financiero": (
+        "Empresas que buscan optimizar su estructura de pasivos para mejorar el flujo de caja, "
+        "ordenar vencimientos y lograr mayor eficiencia financiera."
     ),
 
-    # DAP (Depósito a plazo)
+    # --- DAP (Depósito a plazo) ---
     "Ahorro objetivo": (
-        "Clientes que quieren reservar un monto con un objetivo concreto (viaje, estudio, "
-        "proyecto futuro), usando un instrumento conservador y de plazo definido."
+        "Planificadores que reservan capital para una meta específica de alto valor. "
+        "Buscan certeza absoluta en el monto final."
     ),
     "Fondo de emergencia": (
-        "Clientes que buscan constituir o reforzar un fondo de emergencia, priorizando liquidez "
-        "y seguridad por sobre retornos extremos."
+        "Clientes prudentes que construyen un colchón de liquidez seguro ante imprevistos, "
+        "protegiendo su estilo de vida."
     ),
     "Inversión conservadora": (
-        "Clientes con perfil más conservador o parte de un portafolio donde se desea estabilidad, "
-        "priorizando preservación de capital y retornos predecibles."
+        "Perfiles que ya han acumulado patrimonio y priorizan su preservación por sobre el riesgo. "
+        "Valoran la solidez del banco."
     ),
     "Plan de corto plazo": (
-        "Clientes que desean invertir excedentes por unos meses, manteniendo visibilidad del retorno "
-        "y fecha de vencimiento del depósito."
+        "Gestión de tesorería personal para excedentes puntuales. "
+        "Buscan eficiencia: que el dinero no esté inmovilizado sin rentar."
     ),
     "Plan de largo plazo": (
-        "Clientes con horizonte de varios años, que prefieren definir plazos más largos para "
-        "aprovechar mejores condiciones o mayor disciplina de ahorro."
+        "Inversión estructurada con visión de futuro, aprovechando tasas para asegurar retornos "
+        "en horizontes mayores."
     ),
 
-    # Crédito hipotecario
+    # --- Crédito hipotecario ---
     "Primera vivienda": (
-        "Clientes que buscan financiar su primera vivienda, combinando logro personal con estabilidad "
-        "de largo plazo. El tono debe ser aspiracional pero responsable."
+        "Profesionales comprando su primer departamento o casa. Es un hito de vida y éxito. "
+        "Necesitan guía experta y agilidad en el proceso."
     ),
     "Mejora de vivienda actual": (
-        "Clientes que quieren cambiarse a una vivienda mejor ubicada, más amplia o de mejor estándar, "
-        "manteniendo orden en su carga financiera."
+        "Upgrade a una propiedad de mayor estándar o mejor ubicación (barrios exclusivos). "
+        "Buscan calidad de vida y plusvalía."
     ),
     "Inversión inmobiliaria": (
-        "Clientes que buscan adquirir una propiedad como inversión, pensando en arriendo, plusvalía "
-        "y expansión de su patrimonio."
+        "Inversionistas sofisticados ampliando su portafolio de rentas. "
+        "Analizan la operación con lógica financiera (tasa, rentabilidad)."
     ),
     "Refinanciar hipotecario": (
-        "Clientes que ya tienen un crédito hipotecario y quieren evaluar condiciones mejores "
-        "en tasa, plazo o estructura de pagos."
+        "Optimización financiera: clientes buscando mejorar las condiciones de su deuda "
+        "aprovechando oportunidades de mercado."
     ),
 
-    # Refinanciar deuda
+    # --- Refinanciar deuda ---
     "Consolidar deudas consumo": (
-        "Clientes con varios créditos de consumo o préstamos dispersos que necesitan unificarlos "
-        "en una estructura más simple, con una o pocas cuotas."
+        "Estrategia de orden: unificar compromisos para simplificar la gestión mensual "
+        "y liberar carga mental."
     ),
     "Bajar dividendo hipotecario": (
-        "Clientes que buscan revisar su crédito hipotecario actual para bajar la cuota mensual, "
-        "entendiendo el impacto en plazo y costo total."
+        "Gestión de flujo de caja: reducir la carga fija mensual para destinar recursos a otros fines "
+        "o inversión."
     ),
     "Reorganizar tarjetas de crédito": (
-        "Clientes con múltiples tarjetas o saldos altos, que necesitan orden, menor carga de interés "
-        "y una estructura de pago más clara."
+        "Limpieza financiera: eliminar saldos rotativos caros para pasarlos a una estructura "
+        "de crédito más eficiente y barata."
     ),
     "Ordenar líneas y sobregiros": (
-        "Clientes que usan líneas de crédito y sobregiros como financiamiento permanente y buscan "
-        "reemplazarlo por una deuda más ordenada y estructurada."
+        "Estructuración de pasivos: formalizar deuda de corto plazo en un crédito estructurado."
     ),
 
-    # Apertura producto - Cuenta corriente
-    "Cuenta sueldo": (
-        "Clientes que quieren recibir su sueldo en Banco BICE para ordenar mejor sus finanzas "
-        "and acceder a beneficios asociados."
+    # --- Apertura producto - Cuenta corriente (OPTIMIZADO) ---
+    "Cuenta digital GO BICE": (
+        "Jóvenes profesionales que exigen una experiencia 100% digital, ágil y sin fricciones. "
+        "Valoran la autonomía total desde el celular y ven en GO BICE su puerta de entrada "
+        "a un servicio de estándar superior."
+    ),
+    "Cuenta corriente Universitaria": (
+        "Estudiantes de educación superior (últimos años) que buscan su primer aliado financiero serio. "
+        "Valoran una cuenta costo cero mientras estudian, beneficios en tecnología y tiempo libre, "
+        "y una App que les permita gestionar su dinero sin trámites burocráticos."
     ),
     "Cuenta para PyME": (
-        "Empresas o emprendedores que necesitan una cuenta para operar el día a día: pagos, recaudación "
-        "y relación con proveedores, con soporte especializado."
+        "Empresarios que necesitan una cuenta operativa robusta y digital que siga el ritmo de su negocio."
     ),
     "Cuenta alta renta": (
-        "Clientes de renta alta que buscan una relación bancaria con servicio más personalizado, "
-        "acceso a productos avanzados e integración con inversión y crédito."
+        "Clientes Banca Privada que exigen un servicio impecable, ejecutivo de inversión "
+        "y productos exclusivos."
     ),
     "Cuenta para profesional independiente": (
-        "Profesionales independientes que necesitan separar finanzas personales y del negocio, "
-        "ordenar ingresos variables y mejorar su estructura de pagos."
+        "Médicos, abogados o consultores que requieren separar sus flujos con herramientas "
+        "bancarias profesionales."
     ),
 
-    # Apertura producto - Tarjeta de crédito
+    # --- Apertura producto - Tarjeta de crédito ---
     "Viajes internacionales": (
-        "Clientes que viajan fuera de Chile y valoran seguridad, beneficios en viajes y flexibilidad "
-        "para compras en el extranjero."
+        "Viajeros frecuentes (Jet-set) que exigen salones VIP, seguros integrales y cero fricción "
+        "al pagar en el extranjero."
     ),
     "Compras diarias": (
-        "Clientes que usan la tarjeta en su gasto cotidiano y necesitan visibilidad y control "
-        "del presupuesto mensual."
+        "Usuarios intensivos que maximizan la acumulación de puntos/millas en su gasto habitual."
     ),
     "Compras online": (
-        "Clientes que compran frecuentemente por canales digitales y valoran seguridad, "
-        "beneficios y experiencia fluida en e-commerce."
+        "Perfil digital que valora la seguridad extrema en transacciones e-commerce y "
+        "casillas en USA."
     ),
     "Segmento alta renta": (
-        "Clientes de alto ingreso que buscan beneficios superiores, mejor servicio y una experiencia "
-        "de tarjeta alineada a su estilo de vida."
+        "Tarjeta Black/Infinite como símbolo de estatus y herramienta de acceso a privilegios exclusivos."
     ),
 
-    # Seguros
+    # --- Seguros ---
     "Seguro de auto": (
-        "Clientes que quieren proteger su vehículo, con foco en asistencia en ruta, reparación y "
-        "tranquilidad frente a siniestros."
+        "Protección total para vehículos de alta gama. Lo que se valora es la asistencia premium "
+        "y la respuesta inmediata (auto de reemplazo, taller de marca)."
     ),
     "Seguro de vida": (
-        "Clientes que buscan proteger a su familia ante eventos graves, garantizando respaldo económico "
-        "en momentos complejos."
+        "Responsabilidad y legado: asegurar el bienestar del grupo familiar ante cualquier eventualidad."
     ),
     "Seguro de hogar": (
-        "Clientes que quieren proteger su vivienda y contenido del hogar ante incendios, robos o daños, "
-        "cuidando su patrimonio."
+        "Protección del patrimonio inmobiliario y los bienes contenidos. Tranquilidad total en el hogar."
     ),
     "Seguro de viaje": (
-        "Clientes que viajan dentro o fuera de Chile y valoran cobertura médica, asistencia y protección "
-        "ante imprevistos en el trayecto."
+        "Cobertura médica internacional robusta para viajar sin preocupaciones sanitarias o logísticas."
     ),
     "Seguro de salud": (
-        "Clientes que desean complementar su cobertura actual de salud, reduciendo el impacto "
-        "económico de atenciones médicas o tratamientos."
+        "Complemento de salud de alto nivel (Catastrófico, Clínica exclusiva) para garantizar "
+        "la mejor atención médica posible."
     ),
 }
 
-#: Mapa campaña -> lista de clusters permitidos (debe reflejar constants.ts del backend)
+# ============================================================
+# 2. MAPA DE CAMPAÑAS (Validación Frontend)
+# ============================================================
 CAMPAIGN_CLUSTERS: Dict[str, List[str]] = {
     "Crédito de consumo - Persona": [
         "Auto familiar",
@@ -218,11 +206,9 @@ CAMPAIGN_CLUSTERS: Dict[str, List[str]] = {
         "Viajes solteros",
     ],
     "Crédito de consumo - Empresa": [
-        "Capital de trabajo",
-        "Inversión en activos",
-        "Ordenar pasivos empresa",
-        "Expansión del negocio",
-        "Capital para impuestos",
+        "Liquidez Operativa",
+        "Inversión para Crecer",
+        "Reordenamiento Financiero",
     ],
     "DAP (Depósito a plazo)": [
         "Ahorro objetivo",
@@ -243,8 +229,10 @@ CAMPAIGN_CLUSTERS: Dict[str, List[str]] = {
         "Reorganizar tarjetas de crédito",
         "Ordenar líneas y sobregiros",
     ],
+    # --- ACTUALIZADO: NUEVOS CLUSTERS CUENTA CORRIENTE ---
     "Apertura producto - Cuenta corriente": [
-        "Cuenta sueldo",
+        "Cuenta digital GO BICE",
+        "Cuenta corriente Universitaria",
         "Cuenta para PyME",
         "Cuenta alta renta",
         "Cuenta para profesional independiente",
@@ -264,49 +252,77 @@ CAMPAIGN_CLUSTERS: Dict[str, List[str]] = {
     ],
 }
 
-#: Overrides opcionales por campaña+cluster (cuando el contexto cambia mucho)
+# ============================================================
+# 3. CONTEXTO AVANZADO (El "Cómo" según la Campaña)
+# ============================================================
+# Aquí definimos matices finos para guiar al Prompt Builder.
 CAMPAIGN_CLUSTER_CONTEXT: Dict[str, Dict[str, str]] = {
-    # Ejemplos – se pueden ir afinando con el tiempo
+    # --- CONSUMO PERSONAS ---
     "Crédito de consumo - Persona": {
         "Auto familiar": (
-            "Presenta el crédito de consumo como una forma de renovar el auto familiar, "
-            "destacando seguridad, espacio y comodidad, sin sobreprometer beneficios."
+            "Presenta el crédito como la vía inteligente para renovar el SUV familiar, "
+            "enfatizando la seguridad de los hijos y la comodidad de los viajes en familia."
         ),
         "Auto soltero": (
-            "Enfoca el crédito en renovar el auto del cliente, ligado a independencia y estilo de vida, "
-            "manteniendo un tono sobrio y responsable."
+            "Enfoca el mensaje en el placer de conducir y el upgrade de estilo de vida. "
+            "El auto como extensión del éxito personal."
         ),
         "Mejora del hogar": (
-            "Plantea el crédito como herramienta para remodelar o ampliar la vivienda, "
-            "con foco en confort y valorización del inmueble."
+            "Inspirar con la idea de la casa soñada: la nueva terraza, la cocina de chef. "
+            "El crédito hace realidad ese espacio de disfrute."
         ),
-        "Reorganizar finanzas joven": (
-            "Propón el crédito como forma de ordenar deudas dispersas, bajar la carga mensual "
-            "y recuperar tranquilidad, con tono empático."
-        ),
-        "Reorganizar finanzas senior": (
-            "Habla de simplificar pagos y ganar estabilidad, explicando claramente condiciones y plazos, "
-            "con lenguaje muy respetuoso."
+        "Viajes familiares": (
+            "Conecta con la emoción de viajar sin preocupaciones financieras. "
+            "El crédito permite pagar el viaje soñado en cuotas cómodas."
         ),
     },
+
+    # --- EMPRESAS (Foco: Eficiencia y Sociedad) ---
     "Crédito de consumo - Empresa": {
-        "Capital de trabajo": (
-            "Enfatiza que el crédito apoya el ciclo operativo del negocio, cubriendo brechas de caja "
-            "sin desordenar la estructura financiera."
+        "Liquidez Operativa": (
+            "Habla de agilidad, continuidad y respaldo para no detener la operación. "
+            "Tono resolutivo y experto: 'Tu negocio no puede esperar'."
         ),
-        "Inversión en activos": (
-            "Vincula el crédito con la renovación de equipos, tecnología o infraestructura que permitan "
-            "hacer crecer la empresa."
+        "Inversión para Crecer": (
+            "Tono de socio estratégico que impulsa la modernización y el futuro. "
+            "Enfócate en competitividad y liderazgo en el mercado."
         ),
     },
-    # El resto de combinaciones usa el fallback genérico con la descripción base del cluster.
+
+    # --- CUENTA CORRIENTE (NUEVO CONTEXTO) ---
+    "Apertura producto - Cuenta corriente": {
+        "Cuenta digital GO BICE": (
+            "Enfoca el mensaje en la rapidez y simplicidad del onboarding digital, destacando que GO BICE "
+            "permite abrir una cuenta corriente en minutos desde el celular. Reforzar que es una puerta "
+            "premium de entrada al ecosistema BICE."
+        ),
+    },
+
+    # --- SEGUROS (Foco: Respaldo Premium y Respuesta) ---
+    "Seguros": {
+        "Seguro de auto": (
+            "Enfócate en la 'Seguridad de Élite'. No solo es reparar el auto, es la asistencia premium, "
+            "auto de reemplazo y taller de marca. Tranquilidad total en ruta."
+        ),
+        "Seguro de viaje": (
+            "La libertad de explorar el mundo sabiendo que BICE te respalda ante cualquier emergencia médica. "
+            "Viaja como un local, protegido globalmente."
+        ),
+    },
+
+    # --- TARJETAS (Foco: Lifestyle) ---
+    "Apertura producto - Tarjeta de crédito": {
+        "Viajes internacionales": (
+            "Destaca la experiencia 'Fricción Cero' en el extranjero: Salones VIP y 0% comisión. "
+            "El cliente es un ciudadano del mundo."
+        ),
+    }
 }
 
 
 def clusters_for_campaign(campaign: str) -> list[str]:
     """
-    Devuelve la lista de clusters válidos para una campaña dada
-    (según la misma lógica que el backend Node).
+    Devuelve la lista de clusters válidos para una campaña dada.
     """
     normalized = normalize_campaign(campaign)
     return CAMPAIGN_CLUSTERS.get(normalized, [])
@@ -314,43 +330,42 @@ def clusters_for_campaign(campaign: str) -> list[str]:
 
 def describe_cluster(cluster: str, campaign: Optional[str] = None) -> str:
     """
-    Devuelve una descripción amigable del cluster.
-    Si se entrega campaña, intenta contextualizar el mensaje a ese producto.
+    Devuelve una descripción amigable y contextualizada del cluster.
+    Aplica lógica de 'Anclaje Geográfico' para evitar alucinaciones.
     """
     base = CLUSTERS.get(cluster)
     normalized_campaign: Optional[str] = (
         normalize_campaign(campaign) if campaign else None
     )
 
-    # 1) Contexto específico campaña+cluster (si existe override)
+    # 1) Contexto específico (Override manual si existe en CAMPAIGN_CLUSTER_CONTEXT)
     if normalized_campaign:
         override = CAMPAIGN_CLUSTER_CONTEXT.get(
             normalized_campaign, {}
         ).get(cluster)
         if override:
-            return override
+            # Enriquecemos el override con el anclaje demográfico
+            return f"{override} (Perfil: Cliente ABC1 residente en Chile)."
 
-    # 2) Descripción base + instrucción genérica de adaptación al producto
+    # 2) Descripción base + Instrucción de adaptación
     if base and normalized_campaign:
         return (
-            f"{base} En el contexto de la campaña '{normalized_campaign}', "
-            "explica cómo este producto ayuda específicamente a este segmento, "
-            "con foco en beneficios concretos, lenguaje claro y tono Banco BICE."
+            f"{base} EN CONTEXTO DE: '{normalized_campaign}'. "
+            "Adapta el mensaje para conectar emocionalmente con este perfil aspiracional. "
+            "NOTA: El cliente es residente en Chile (Perfil Banca Privada)."
         )
 
-    # 3) Solo descripción base del cluster
+    # 3) Fallback
     if base:
         return base
 
-    # 4) Fallback total
-    if normalized_campaign:
-        return (
-            f"Segmento de clientes identificado como '{cluster}' para la campaña "
-            f"'{normalized_campaign}'. Ajusta el mensaje a su contexto, necesidades "
-            "financieras y etapa de vida."
-        )
+    return f"Segmento '{cluster}'. Ajusta el mensaje a un perfil de renta alta residente en Chile."
 
-    return (
-        f"Segmento de clientes identificado como '{cluster}'. "
-        "Ajusta el mensaje a su contexto, necesidades financieras y etapa de vida."
-    )
+
+__all__ = [
+    "CLUSTERS",
+    "CAMPAIGN_CLUSTERS",
+    "CAMPAIGN_CLUSTER_CONTEXT",
+    "clusters_for_campaign",
+    "describe_cluster"
+]

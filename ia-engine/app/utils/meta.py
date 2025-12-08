@@ -8,29 +8,43 @@ from app.utils.copy_meta import BENEFITS, CTAS, SUBJECTS, CLUSTER_TONE
 
 def get_meta() -> Dict[str, Any]:
     """
-    Devuelve el catálogo de campañas, clusters y metadatos de copy
-    que usarán backend y frontend.
+    Devuelve el catálogo maestro para el Frontend y Backend.
 
-    - `campaigns`: nombres canónicos de campaña (keys de CAMPAIGNS_TONE).
-    - `clusters`: nombres canónicos de cluster (keys de CLUSTERS).
-    - `campaignClusters`: mapa campaña → [clusters válidos].
-    - `benefits`: beneficios sugeridos por campaña (keys canónicas).
-    - `ctas`: CTAs sugeridas por campaña (keys canónicas).
-    - `subjects`: asuntos de referencia por campaña (keys canónicas).
-    - `clusterTone`: lineamientos de tono por cluster (keys = clusters canónicos).
-
-    La compatibilidad con nombres antiguos se maneja con aliases en:
-    - app.utils.campaigns.CAMPAIGN_ALIASES
+    Estructura de retorno optimizada para UI dinámica:
+    - campaigns: Lista de objetos {id, label, description}.
+    - clusters: Lista de objetos {id, label, description}.
+    - mapping: Diccionario { campaign_id: [cluster_ids] }.
+    - defaults: Diccionario con benefits, ctas, subjects y tone (copy assets).
     """
-    campaigns: List[str] = list(CAMPAIGNS_TONE.keys())
-    clusters: List[str] = list(CLUSTERS_DEF.keys())
+
+    # Transformamos el dict de campañas en una lista de objetos para el UI
+    campaigns_ui = [
+        {
+            "id": name,
+            "label": name,
+            "description": desc
+        }
+        for name, desc in CAMPAIGNS_TONE.items()
+    ]
+
+    # Transformamos el dict de clusters en una lista de objetos para el UI
+    clusters_ui = [
+        {
+            "id": name,
+            "label": name,
+            "description": desc
+        }
+        for name, desc in CLUSTERS_DEF.items()
+    ]
 
     return {
-        "campaigns": campaigns,
-        "clusters": clusters,
-        "campaignClusters": CAMPAIGN_CLUSTERS,
-        "benefits": BENEFITS,
-        "ctas": CTAS,
-        "subjects": SUBJECTS,
-        "clusterTone": CLUSTER_TONE,
+        "campaigns": campaigns_ui,
+        "clusters": clusters_ui,
+        "mapping": CAMPAIGN_CLUSTERS,  # Relación Campaña -> Clusters permitidos
+        "defaults": {
+            "benefits": BENEFITS,
+            "ctas": CTAS,
+            "subjects": SUBJECTS,
+            "clusterTone": CLUSTER_TONE,
+        }
     }

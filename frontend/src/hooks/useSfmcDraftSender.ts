@@ -27,9 +27,19 @@ interface UseSfmcSenderProps {
   editedRef: React.MutableRefObject<EmailContentSet[] | null>;
 }
 
+// NUEVO: Estructura de datos para el éxito
+export interface SfmcSuccessData {
+  imageUrl?: string;
+  emailId?: number | string;
+  customerKey?: string;
+  timestamp: string;
+}
+
 export function useSfmcDraftSender() {
   const [isUploading, setIsUploading] = useState(false);
-  const [sfmcNotice, setSfmcNotice] = useState<string | null>(null);
+  
+  // CAMBIO: Ahora guardamos el objeto completo, no un string
+  const [sfmcSuccess, setSfmcSuccess] = useState<SfmcSuccessData | null>(null);
 
   async function sendToSfmc({
     batchId,
@@ -41,7 +51,7 @@ export function useSfmcDraftSender() {
     if (!batchId || !livePreview) return;
 
     setIsUploading(true);
-    setSfmcNotice(null);
+    setSfmcSuccess(null); // Limpiar estado anterior
 
     try {
       // 1. Resolver datos finales
@@ -98,25 +108,17 @@ export function useSfmcDraftSender() {
       const res = await postSfmcDraftEmail(payload);
       if (!res.ok) throw new Error(res.error || "Falla en envío SFMC");
 
-      // 4. Notificar éxito
-      const msg = [
-          "✅ Enviado a SFMC.",
-          res.result?.step?.uploadImage?.publishedURL
-            ? `Imagen publicada: ${res.result.step.uploadImage.publishedURL}`
-            : "",
-          res.result?.step?.createEmailDraft?.id
-            ? `Email ID: ${res.result.step.createEmailDraft.id}`
-            : "",
-          res.result?.step?.createEmailDraft?.customerKey
-            ? `CustomerKey: ${res.result.step.createEmailDraft.customerKey}`
-            : "",
-        ]
-        .filter(Boolean)
-        .join(" ");
-        
-      setSfmcNotice(msg);
-      toast.success("Borrador de email creado en SFMC.");
-      return true; // Indicar éxito
+      // 4. Guardar datos estructurados (CAMBIO CLAVE)
+      const successData: SfmcSuccessData = {
+        imageUrl: res.result?.step?.uploadImage?.publishedURL,
+        emailId: res.result?.step?.createEmailDraft?.id,
+        customerKey: res.result?.step?.createEmailDraft?.customerKey,
+        timestamp: new Date().toLocaleTimeString(),
+      };
+
+      setSfmcSuccess(successData);
+      toast.success("Borrador creado en Salesforce Marketing Cloud.");
+      return true;
     } catch (e: any) {
       toast.error(e?.message || "Error enviando a SFMC.");
       return false;
@@ -127,8 +129,8 @@ export function useSfmcDraftSender() {
 
   return {
     isUploading,
-    sfmcNotice,
-    setSfmcNotice, // Por si el padre necesita resetearlo
+    sfmcSuccess,   // Exponemos el objeto
+    setSfmcSuccess, 
     sendToSfmc,
   };
 }

@@ -1,7 +1,6 @@
 // backend/src/services/iaEngine.ts
 import "dotenv/config";
 import { GenerateEmailResponseSchema } from "../lib/ia-engine.schema";
-import { isValidCampaign, isValidCluster } from "../utils/validate";
 
 /* ============================================================
  * Tipos
@@ -30,19 +29,19 @@ export type EmailSetLike = {
  * Configuración
  * ============================================================ */
 
-// Puerto por defecto del IA Engine en LOCAL (cuando lo corres a mano)
+// IMPORTANTE: En Docker, IA_ENGINE_BASE_URL debe ser "http://ia-engine:8000"
+// Evitamos reemplazar "localhost" ciegamente, ya que en Docker los hostnames son distintos.
 const DEFAULT_BASE_URL = "http://127.0.0.1:8000";
-
 const rawBase = process.env.IA_ENGINE_BASE_URL || DEFAULT_BASE_URL;
 
-// Normalizamos URL (evita "localhost" y elimina "/" final)
-export const IA_ENGINE_BASE_URL = rawBase
-  .replace("localhost", "127.0.0.1")
-  .replace(/\/+$/, "");
+export const IA_ENGINE_BASE_URL = rawBase.replace(/\/+$/, "");
 
 export const IA_ENGINE_ENABLED =
   process.env.IA_ENGINE_ENABLED === "1" ||
   process.env.IA_ENGINE_ENABLED?.toLowerCase() === "true";
+
+// Log de arranque para verificar conexión en logs de Docker
+console.log(`[iaEngine] Configurado con URL: ${IA_ENGINE_BASE_URL}`);
 
 /* ============================================================
  * Helper: fetch con timeout
@@ -51,7 +50,7 @@ export const IA_ENGINE_ENABLED =
 async function fetchWithTimeout(
   resource: string,
   options: any = {},
-  timeoutMs = 30000
+  timeoutMs = 120000 // Aumentado a 120s para dar margen a generación de imágenes
 ) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
@@ -65,7 +64,8 @@ async function fetchWithTimeout(
     return res;
   } catch (err: any) {
     clearTimeout(id);
-    throw new Error(`IA Engine network/timeout error: ${err?.message || err}`);
+    const msg = err.name === 'AbortError' ? 'Request Timeout' : (err.message || err);
+    throw new Error(`IA Engine connection error (${resource}): ${msg}`);
   }
 }
 
@@ -84,55 +84,44 @@ export async function generateEmailSetsViaIAEngine(params: {
     return [];
   }
 
-  // Validaciones suaves de catálogo (no rompen flujo si falla)
-  if (!isValidCampaign(params.campaign)) {
-    console.warn(
-      `[iaEngine] campaign fuera de catálogo: "${params.campaign}". Revisa backend/src/utils/constants.ts`
-    );
-  }
-  if (!isValidCluster(params.cluster)) {
-    console.warn(
-      `[iaEngine] cluster fuera de catálogo: "${params.cluster}". Revisa backend/src/utils/constants.ts`
-    );
-  }
-
   const payload = {
     campaign: params.campaign,
     cluster: params.cluster,
-    // IMPORTANTE: el motor Python espera "sets"
     sets: params.setCount,
     feedback: params.feedback ?? undefined,
   };
 
   const url = `${IA_ENGINE_BASE_URL}/ia/generate`;
 
-  console.log("\n====================================");
-  console.log("[iaEngine] POST →", url);
-  console.log("[iaEngine] payload →", JSON.stringify(payload));
-  console.log("====================================\n");
+  console.log(`[iaEngine] POST → ${url}`);
 
   /* -------------------------------
    * Llamada HTTP real
    * ------------------------------- */
-  const res = await fetchWithTimeout(
-    url,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    },
-    30000
-  );
+  let res: Response;
+  try {
+    res = await fetchWithTimeout(
+      url,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+      120000 // Timeout específico para texto (120s es seguro)
+    );
+  } catch (netErr: any) {
+    console.error("[iaEngine] Network Error:", netErr.message);
+    throw netErr;
+  }
 
   if (!res.ok) {
     let text = "";
     try {
       text = await res.text();
     } catch (_) {}
-
-    throw new Error(
-      `IA Engine responded ${res.status}: ${text || res.statusText}`
-    );
+    const errMsg = `IA Engine responded ${res.status}: ${text.slice(0, 300) || res.statusText}`;
+    console.error(`[iaEngine] Error Response: ${errMsg}`);
+    throw new Error(errMsg);
   }
 
   /* -------------------------------
@@ -145,14 +134,15 @@ export async function generateEmailSetsViaIAEngine(params: {
     throw new Error(`IA Engine JSON parse error: ${err}`);
   }
 
+  // Validación Zod para asegurar contrato
   const parsed = GenerateEmailResponseSchema.safeParse(raw);
   if (!parsed.success) {
     console.error(
-      "[iaEngine] IA Engine payload inválido:",
+      "[iaEngine] Zod Validation Failed:",
       parsed.error.flatten()
     );
     throw new Error(
-      "IA Engine retornó un payload inválido (mismatch con schema GenerateEmailResponse)."
+      "IA Engine retornó datos que no coinciden con el esquema esperado (GenerateEmailResponse)."
     );
   }
 
@@ -189,7 +179,7 @@ export async function generateEmailSetsViaIAEngine(params: {
       (t: EmailSetLike) => t.subject || t.preheader || t.body.content
     );
 
-  console.log("[iaEngine] ✔️ Variantes recibidas:", mapped.length);
+  console.log(`[iaEngine] ✔️ Recibidas ${mapped.length} variantes.`);
 
   return mapped;
 }
