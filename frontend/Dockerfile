@@ -48,8 +48,9 @@ WORKDIR /usr/share/nginx/html
 # Copia el build estático desde la etapa de build
 COPY --from=build /app/dist ./ 
 
-# Config de Nginx para SPA (redirige todo a index.html)
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# CORRECCIÓN PARA CLOUD RUN:
+# Copiamos a la carpeta de templates para que envsubst reemplace ${BACKEND_URL} al iniciar
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 
 EXPOSE 8080
 
