@@ -5,7 +5,7 @@ A nivel de negocio hablamos de *sets de contenido*:
 cada set = {subject, preheader, title, subtitle, body, cta}.
 """
 
-from typing import Optional
+from typing import Optional, Any
 
 from pydantic import BaseModel, Field
 
@@ -87,3 +87,14 @@ class GenerateRequest(BaseModel):
         """
         self.sets = sets
         return self
+
+
+class ImagePromptRequest(BaseModel):
+    """
+    Request para solicitar la construcción de un prompt de imagen (Prompt as a Service).
+    Centraliza las reglas de branding visual en Python.
+    """
+    campaign: str = Field(..., description="Nombre de la campaña")
+    cluster: str = Field(..., description="Nombre del cluster/segmento")
+    feedback: Optional[Any] = Field(
+        None, description="Feedback o 'hint' visual del usuario")

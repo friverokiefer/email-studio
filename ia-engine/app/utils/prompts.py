@@ -49,6 +49,10 @@ def _json_only_clause() -> str:
 
 
 def _extract_feedback_text(feedback: Any) -> str:
+    """
+    Extrae y combina el feedback del usuario (Subject, Preheader, Body).
+    CORRECCIÓN: Ahora incluye explícitamente el 'preheader' que antes se ignoraba.
+    """
     if not feedback:
         return ""
     try:
@@ -58,11 +62,19 @@ def _extract_feedback_text(feedback: Any) -> str:
         if isinstance(feedback, dict):
             if f := feedback.get("subject"):
                 parts.append(f"Subject Idea: {f}")
+            # --- NUEVO: Captura explícita del preheader ---
+            if f := feedback.get("preheader"):
+                parts.append(f"Preheader Idea: {f}")
+            # ----------------------------------------------
             if f := feedback.get("bodyContent") or feedback.get("body"):
                 parts.append(f"Content Focus: {f}")
         else:
             if getattr(feedback, "subject", None):
                 parts.append(f"Subject Idea: {feedback.subject}")
+            # --- NUEVO: Captura explícita del preheader ---
+            if getattr(feedback, "preheader", None):
+                parts.append(f"Preheader Idea: {feedback.preheader}")
+            # ----------------------------------------------
             if getattr(feedback, "bodyContent", None):
                 parts.append(f"Content Focus: {feedback.bodyContent}")
         return " | ".join(parts)
@@ -145,7 +157,10 @@ def build_email_prompt(campaign: str, cluster: str, feedback: Any = None, varian
     normalized_camp = normalize_campaign(campaign)
     official_benefits = BENEFITS.get(normalized_camp, [])
     approved_ctas = CTAS.get(normalized_camp, [])
+
+    # AQUI ESTÁ LA MEJORA: feedback_str ahora contiene el "Preheader Idea"
     feedback_str = _extract_feedback_text(feedback)
+
     cluster_desc = describe_cluster(cluster, normalized_camp)
 
     # Inyectamos la estructura FLEXIBLE basada en campaña
@@ -153,6 +168,8 @@ def build_email_prompt(campaign: str, cluster: str, feedback: Any = None, varian
 
     system = (
         f"{BICE_TEXT_TONE}\n\n"
+        # REGLA DE IDIOMA
+        f"IDIOMA DE SALIDA: Español de Chile (Neutro y formal).\n\n"
         f"{BICE_TEXT_STRUCTURE_BASE}\n"
         f"{dynamic_body_rules}\n\n"
         f"{BICE_TEXT_CONSTRAINTS}\n"

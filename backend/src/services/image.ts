@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs/promises";
 import sharp from "sharp";
 import { getOpenAI } from "./openai";
+import { getImagePromptFromIA } from "./iaEngine"; // <--- IMPORTANTE: Usamos el servicio
 
 /** ===== Helpers internos ===== */
 function pad2(n: number) {
@@ -72,29 +73,6 @@ export async function normalizeJpeg(
   }
 }
 
-/** ========== Prompt builders ========== */
-function buildEmailHeroPrompt({
-  campaign,
-  cluster,
-  promptHint,
-}: {
-  campaign: string;
-  cluster: string;
-  promptHint?: string;
-}) {
-  const parts: string[] = [
-    "Hero para email horizontal (1536x1024) full-bleed.",
-    "SIN texto, SIN logos, SIN marcas de agua, SIN marcos.",
-    "Estilo fotorrealista corporativo, luz natural, moderno y limpio.",
-    "Composición equilibrada.",
-    `Campaña: ${campaign}. Cluster: ${cluster}.`,
-  ];
-  if (promptHint && String(promptHint).trim()) {
-    parts.push(`Pista creativa: ${String(promptHint).trim().slice(0, 300)}`);
-  }
-  return parts.join(" ");
-}
-
 /** ===== Timeout & Download Helpers ===== */
 function delay(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -161,11 +139,17 @@ export async function generateHeroPNG({
   const client = getOpenAI();
   
   const MODEL = "gpt-image-1";
-  // AJUSTE CRÍTICO: "medium" es soportado por tu modelo, "standard" no.
   const QUALITY: ImageQualityUnion = "medium"; 
   const SIZE: ImageSizeUnion = pickSizeForModel(process.env.IMAGE_SIZE); 
   
-  const prompt = buildEmailHeroPrompt({ campaign, cluster, promptHint });
+  // <--- CAMBIO CRÍTICO: Pedimos el prompt al servicio de IA en Python
+  // Esto asegura que se usen las reglas de Branding de Python (Clean Image Rule)
+  console.log(`[image] Solicitando prompt optimizado a IA Engine...`);
+  const prompt = await getImagePromptFromIA({
+      campaign,
+      cluster,
+      feedback: promptHint
+  });
 
   const base = `hero_v${pad2(versionIndex)}`;
   const tmpPath = path.join(outDir, `${base}.tmp.jpg`);
@@ -189,11 +173,10 @@ export async function generateHeroPNG({
       const res = await withTimeout(
         client.images.generate({
           model: MODEL,
-          prompt: prompt,
+          prompt: prompt, // Usamos el prompt traído de Python
           size: SIZE,
           quality: QUALITY,
           n: 1,
-          // response_format: "b64_json" REMOVIDO por compatibilidad
         }),
         PER_ATTEMPT_TIMEOUT,
         "images.generate"
@@ -237,7 +220,8 @@ export async function generateHeroPNG({
         quality: QUALITY,
         sizeNormalized: `${metaFallback.width}x${metaFallback.height}`,
         fallback: true,
-        error: lastErr?.message
+        error: lastErr?.message,
+        prompt: prompt, 
       } as any,
     };
   }
@@ -275,6 +259,7 @@ export async function generateHeroPNG({
       height: finalMeta.height,
       quality: QUALITY,
       sizeNormalized: `${finalMeta.width}x${finalMeta.height}`,
+      prompt: prompt,
     },
   };
 }
@@ -296,7 +281,6 @@ export async function generateBannerJPG({
   const client = getOpenAI();
   
   const MODEL = "gpt-image-1";
-  // AJUSTE CRÍTICO: "medium"
   const QUALITY: ImageQualityUnion = "medium";
   const SIZE: ImageSizeUnion = pickSizeForModel(process.env.IMAGE_SIZE);
 
@@ -366,6 +350,8 @@ export async function generateBannerJPG({
         quality: QUALITY,
         sizeNormalized: `${metaFallback.width}x${metaFallback.height}`,
         fallback: true,
+        error: lastErr?.message,
+        prompt: prompt, 
       } as any,
     };
   }

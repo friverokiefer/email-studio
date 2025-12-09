@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os  # <--- NUEVO: Para leer variables de entorno
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple  # <--- AGREGADO Tuple
 
 from app.models.request import GenerateRequest
 from app.models.response import GeneratedVariant, BodyBlock
@@ -53,10 +53,10 @@ def _map_json_to_variant(data: Dict[str, Any], index: int) -> GeneratedVariant:
     )
 
 
-def generate_sets(request: GenerateRequest) -> List[GeneratedVariant]:
+def generate_sets(request: GenerateRequest) -> Tuple[List[GeneratedVariant], List[Dict[str, Any]]]:
     """
     Orquesta la generación de variantes de texto.
-    Usa temperatura dinámica definida en .env (OPENAI_CREATIVE_TEMP).
+    Retorna (variants, prompts_debug_info).
     """
     campaign, cluster = soft_validate_campaign_cluster(
         request.campaign, request.cluster)
@@ -64,6 +64,7 @@ def generate_sets(request: GenerateRequest) -> List[GeneratedVariant]:
     # Validamos rango seguro de sets (1 a 5)
     total_sets = max(1, min(5, int(getattr(request, "sets", 1))))
     variants = []
+    prompts_debug = []  # <--- NUEVO: Acumulador de prompts
 
     # Leemos la temperatura creativa del entorno
     # AJUSTE: Bajamos el default de 0.85 a 0.6 para asegurar consistencia en formato JSON y reglas negativas.
@@ -83,6 +84,14 @@ def generate_sets(request: GenerateRequest) -> List[GeneratedVariant]:
                 variant_index=i + 1
             )
 
+            # <--- NUEVO: Guardamos el prompt exacto antes de enviar
+            prompts_debug.append({
+                "variant": i + 1,
+                "temperature": creative_temp,
+                "system": system_msg,
+                "user": user_msg
+            })
+
             # Llamada al cliente con la TEMPERATURA DINÁMICA
             data = chat_json(
                 system=system_msg,
@@ -100,8 +109,13 @@ def generate_sets(request: GenerateRequest) -> List[GeneratedVariant]:
             logger.error("Fallo generando variante %d: %s",
                          i + 1, e, exc_info=True)
             variants.append(_stub_variant(request, i, str(e)))
+            # En caso de error, también registramos que falló
+            prompts_debug.append({
+                "variant": i + 1,
+                "error": str(e)
+            })
 
-    return variants
+    return variants, prompts_debug
 
 
 # Alias para exportación

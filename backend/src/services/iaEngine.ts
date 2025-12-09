@@ -25,6 +25,11 @@ export type EmailSetLike = {
   cta?: string;
 };
 
+// NUEVO: Interfaz para tipar la respuesta del prompt de imagen y evitar errores de TS
+interface IaImagePromptResponse {
+  prompt: string;
+}
+
 /* ============================================================
  * Configuración
  * ============================================================ */
@@ -73,15 +78,17 @@ async function fetchWithTimeout(
  * Llamar Microservicio IA Engine (Python / FastAPI)
  * ============================================================ */
 
+// AJUSTE: Retornamos objeto compuesto { sets, metadata }
 export async function generateEmailSetsViaIAEngine(params: {
   campaign: string;
   cluster: string;
   setCount: number;
   feedback?: IaEngineFeedback;
-}): Promise<EmailSetLike[]> {
+}): Promise<{ sets: EmailSetLike[]; metadata: any }> {
+  
   if (!IA_ENGINE_ENABLED) {
     console.warn("[iaEngine] IA_ENGINE_ENABLED=0 → devolviendo vacío.");
-    return [];
+    return { sets: [], metadata: {} };
   }
 
   const payload = {
@@ -181,5 +188,60 @@ export async function generateEmailSetsViaIAEngine(params: {
 
   console.log(`[iaEngine] ✔️ Recibidas ${mapped.length} variantes.`);
 
-  return mapped;
+  return {
+    sets: mapped,
+    metadata: parsed.data.metadata || {}
+  };
+}
+
+/* ============================================================
+ * NUEVO: Obtener Prompt de Imagen (Prompt as a Service)
+ * ============================================================ */
+export async function getImagePromptFromIA(params: {
+  campaign: string;
+  cluster: string;
+  feedback?: string;
+}): Promise<string> {
+  // Fallback seguro si el motor está apagado o falla
+  const fallback = `Hero image for bank campaign: ${params.campaign}, cluster: ${params.cluster}. ${params.feedback || ""}`;
+
+  if (!IA_ENGINE_ENABLED) {
+    console.warn("[iaEngine] Deshabilitado. Retornando fallback prompt local.");
+    return fallback;
+  }
+
+  const url = `${IA_ENGINE_BASE_URL}/ia/image-prompt`;
+  
+  // Pasamos feedback si existe
+  const payload = {
+    campaign: params.campaign,
+    cluster: params.cluster,
+    feedback: params.feedback || null
+  };
+
+  try {
+    // Timeout corto (10s) porque es solo construir texto
+    const res = await fetchWithTimeout(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }, 10000);
+
+    if (!res.ok) {
+      throw new Error(`Status ${res.status}`);
+    }
+
+    // CORRECCIÓN TS: Usamos la interfaz definida arriba para el casteo
+    const data = (await res.json()) as IaImagePromptResponse;
+    
+    if (data && typeof data.prompt === "string") {
+      return data.prompt;
+    }
+    
+    throw new Error("Respuesta inválida (falta campo 'prompt')");
+  } catch (err: any) {
+    console.error(`[iaEngine] Error obteniendo image prompt: ${err.message}`);
+    // Retornamos fallback para no detener el flujo de generación
+    return fallback;
+  }
 }

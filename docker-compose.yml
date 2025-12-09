@@ -19,13 +19,11 @@ services:
       - NODE_ENV=production
       - PORT=8080
       - GOOGLE_APPLICATION_CREDENTIALS=/app/.secrets/service-account.json
-      # Conexión interna de Docker hacia el motor de IA
       - IA_ENGINE_ENABLED=${IA_ENGINE_ENABLED:-1}
       - IA_ENGINE_BASE_URL=http://ia-engine:8000
     volumes:
       - ./backend/.secrets:/app/.secrets:ro
     ports:
-      # Puerto Host:Puerto Contenedor
       - "8080:8080"
     depends_on:
       - ia-engine
@@ -36,14 +34,15 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # IMPORTANTE: Dejamos esto vacío o "/" para usar rutas relativas.
-        # Así la petición va a Nginx (8081) -> Proxy -> Backend (8080)
         VITE_API_BASE: http://localhost:8081
         VITE_GCS_BUCKET: ${GCP_BUCKET_NAME}
         VITE_GCS_PREFIX: ${GCP_PREFIX}
         VITE_SFMC_CATEGORY_ID: ${SFMC_CATEGORY_ID:-239156}
+    # [CAMBIO CLAVE]: Inyectamos las variables que Nginx pide
+    environment:
+      - BACKEND_URL=http://backend:8080
+      - NGINX_RESOLVER=127.0.0.11
     ports:
-      # Nginx escucha en 8080 adentro, lo exponemos en 8081 afuera
       - "8081:8080"
     depends_on:
       - backend

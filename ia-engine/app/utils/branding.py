@@ -1,11 +1,17 @@
 # ia-engine/app/utils/branding.py
 
 # ==========================================
-# 1. IDENTIDAD VISUAL V3.5 (Cinematic Depth & Interaction)
+# 1. IDENTIDAD VISUAL V3.6 (Wider Shot & Pure Photography)
 # ==========================================
 BICE_VISUAL_IDENTITY = (
     "PHOTOGRAPHY STYLE: High-end cinematic advertising photography. 8k resolution. "
-    "CAMERA SPECS: Shot on 85mm portrait lens, f/1.8 aperture for creamy bokeh and cinematic depth separation. "
+
+    # AJUSTE DE CÁMARA: De 85mm (Zoom) a 35mm (Angular).
+    # Esto aleja la cámara y obliga a mostrar el entorno.
+    "CAMERA SPECS: Shot on 35mm lens. Environmental portrait style. "
+    "COMPOSITION: Wide shot (Plano General) or Medium Shot. The subjects should take up about 30-40% of the frame, "
+    "allowing the background/environment to be clearly visible and set the context. Avoid extreme close-ups. "
+
     "VIBE: Optimistic, Premium, Reliable, Genuine Happiness. "
     "INTERACTION RULE (CRITICAL): Subjects must have SHARED FOCUS. They should be looking at each other, "
     "pointing at the same object, or smiling at a shared view. Avoid subjects looking in random directions. "
@@ -15,19 +21,18 @@ BICE_VISUAL_IDENTITY = (
     "COLORS: Corporate palette accents (Deep Navy Blue and Bright Cyan/Turquoise) integrated naturally in clothing or props."
 )
 
-# AJUSTE CRÍTICO DE BLINDAJE DEMOGRÁFICO: Se refuerzan las restricciones raciales/étnicas negativas.
+# AJUSTE CRÍTICO DE BLINDAJE DEMOGRÁFICO
 BICE_DEMOGRAPHIC_BASE = (
     "SUBJECTS IDENTITY (STRICT): "
     "The subjects are ALWAYS Chilean/Southern Cone people (Western-Latin phenotype). "
 
-    # 1. REGLA DE APARIENCIA (High-End & Diversidad Coherente)
+    # 1. REGLA DE APARIENCIA
     "APPEARANCE: Sophisticated, elegant, and well-groomed. "
-    # REFUERZO DE COLOR DE PIEL
     "Physical traits: **Light to Medium-Olive skin tone (Mediterranean/Hispanic phenotype)**. "
     "HAIR: Predominantly Dark Brown/Black. "
     "However, include Natural Blonde, Light Brown, or Red hair in a realistic proportion (approx 10-15% chance) to reflect the diversity of this segment. "
 
-    # 2. REGLA DE CONTEXTO EXTRANJERO (El "Escudo" sofisticado)
+    # 2. REGLA DE CONTEXTO EXTRANJERO
     "CONTEXT RULE (Travel/Foreign): If the location is foreign (Japan, Europe, etc.), depict subjects as SOPHISTICATED TRAVELERS visiting that place. "
     "Crucial: They must retain their Chilean/Western appearance and High-Net-Worth fashion style. "
     "Do NOT make them look like locals of the destination. "
@@ -36,20 +41,22 @@ BICE_DEMOGRAPHIC_BASE = (
     # 3. REGLA DE VESTUARIO
     "ATTIRE: Smart casual luxury (Linen shirts, blazers, high-quality knitwear). No ties, no hiking gear."
 
-    "NEGATIVE PROMPT (CRITICAL): "  # REFUERZO DE LAS RESTRICCIONES NEGATIVAS
+    "NEGATIVE PROMPT (CRITICAL): "
     "Do NOT generate subjects matching the ethnicity of the background location. "
-    "**Do NOT generate Black, East Asian, or Indian phenotypes.** "  # BLINDAJE DIRECTO
+    "**Do NOT generate Black, East Asian, or Indian phenotypes.** "
     "Do NOT generate messy hair, oversized backpacks, or sloppy clothing. "
     "Do NOT generate disconnected characters (Zombie stare)."
 )
 
+# AJUSTE: Eliminamos la petición de logos y líneas.
+# Ahora forzamos "limpieza" para que tú pongas el logo manualmente después.
 BICE_GRAPHIC_OVERLAY = (
-    "GRAPHIC ELEMENTS: Subtle integration of flowing wavy lines in Cyan and Navy Blue framing the scene. "
-    "Optional: Stylish 3D text floating naturally in the scene saying 'BICE'."
+    "CLEAN IMAGE RULE: NO text, NO logos, NO watermarks, NO graphic overlays, NO blue waves. "
+    "Pure photography only. Keep the image clean for post-production."
 )
 
 # ==========================================
-# 2. IDENTIDAD TEXTUAL
+# 2. IDENTIDAD TEXTUAL (Sin cambios)
 # ==========================================
 BICE_TEXT_TONE = (
     "ROL: Lead Copywriter Senior de Banco BICE (Banca Privada). "

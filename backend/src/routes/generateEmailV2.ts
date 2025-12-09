@@ -43,6 +43,7 @@ export type EmailV2Image = {
     height?: number; // dimensión real del JPG final
     sizeNormalized?: string; // p.ej. "1792x1024"
     fallback?: boolean;
+    // prompt?: string; // Opcional en la respuesta pública
   };
 };
 
@@ -292,6 +293,7 @@ generateEmailsV2Router.post("/", async (req, res) => {
 
     /* 1) IMÁGENES (normalizadas COVER 16:9, gpt-image-1, High Quality) */
     const imagesOut: EmailV2Image[] = [];
+    const debugImagePrompts: any[] = []; // <--- NUEVO: Acumulador de prompts de imagen
 
     // IMPORTANTE: tmp ahora es backend/tmp/generated/<batchId>
     const tmpOutDir = path.resolve(process.cwd(), "tmp", "generated", batchId);
@@ -319,6 +321,13 @@ generateEmailsV2Router.post("/", async (req, res) => {
           meta: img.meta,
         }
       );
+
+      // <--- NUEVO: Guardamos el prompt para el JSON debug
+      debugImagePrompts.push({
+          fileName: img.fileName,
+          prompt: img.meta.prompt, // Capturado del servicio (modificado en Parte 1)
+          model: img.meta.model
+      });
 
       if (aborted) {
         console.warn("[emails_v2] abort detected after image gen — stopping early");
@@ -360,6 +369,7 @@ generateEmailsV2Router.post("/", async (req, res) => {
     /* 2) SETS DE CONTENIDO (inyectando hero directo como contexto opcional) */
     let contentSets: EmailContentSet[] = [];
     let iaEngineError: unknown | null = null;
+    let debugTextPrompts: any[] = []; // <--- NUEVO: Acumulador de prompts de texto
 
     const feedbackWithHero: EmailV2Feedback | undefined = (() => {
       const line = `Hero image URL (usar tal cual): ${
@@ -376,12 +386,18 @@ generateEmailsV2Router.post("/", async (req, res) => {
       try {
         console.log("[emails_v2] usando IA Engine externo (Python) para textos…");
 
-        const iaSets = await generateEmailSetsViaIAEngine({
+        // <--- NUEVO: Desestructuramos sets y metadata
+        const { sets: iaSets, metadata: iaMetadata } = await generateEmailSetsViaIAEngine({
           campaign,
           cluster,
           setCount,
           feedback: feedbackWithHero,
         });
+
+        // <--- NUEVO: Extraemos los prompts de texto de la metadata
+        if (iaMetadata && Array.isArray(iaMetadata.prompts_debug)) {
+            debugTextPrompts = iaMetadata.prompts_debug;
+        }
 
         contentSets = iaSets.map((t, idx): EmailContentSet => {
           const clean = sanitizeCopy({
@@ -445,7 +461,21 @@ generateEmailsV2Router.post("/", async (req, res) => {
     // Limpieza tmp (no bloquea)
     fs.rm(tmpOutDir, { recursive: true, force: true }).catch(() => {});
 
-    /* 3) Subir batch.json + _manifest.json a GCS */
+    /* 3) Subir batch.json + _manifest.json + prompts_debug.json a GCS */
+    
+    // <--- NUEVO: Construir y subir prompts_debug.json
+    const promptsJson = {
+        batchId,
+        createdAt,
+        campaign,
+        cluster,
+        prompts: {
+            images: debugImagePrompts,
+            text: debugTextPrompts
+        }
+    };
+    await uploadJson(`emails_v2/${batchId}/prompts_debug.json`, promptsJson);
+
     const batchJson = {
       batchId,
       type: "emails_v2",
@@ -485,6 +515,8 @@ generateEmailsV2Router.post("/", async (req, res) => {
         )}`,
         jsonUrl: cloudBrowserUrl(batchKey),
         manifestUrl: cloudBrowserUrl(manifestKey),
+        // Opcional: retornamos la URL del debug por si la quieres usar en el frontend algún día
+        promptsDebugUrl: cloudBrowserUrl(`emails_v2/${batchId}/prompts_debug.json`), 
         sets: contentSets,
         images: imagesOut,
       });
