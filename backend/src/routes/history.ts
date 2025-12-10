@@ -3,6 +3,7 @@ import { Router } from "express";
 import {
   listEmailV2BatchIds,
   readJson,
+  uploadJson, // <--- Necesario para guardar el caché automáticamente
   getObjectUpdatedAtMs,
   objectExists,
 } from "../services/gcpStorage";
@@ -12,8 +13,10 @@ export const historyRouter = Router();
 /**
  * GET /api/history?type=emails_v2
  * Respuesta: [{ batchId, count, createdAt }]
- * Lee directamente desde GCS: emails_v2/<batchId>/batch.json
- * * MEJORA LOCAL: Chunking agresivo (50) para velocidad y manejo de errores robusto.
+ * * ESTRATEGIA OPTIMIZADA:
+ * 1. Intenta servir desde 'history_index.json' (caché instantáneo).
+ * 2. Si no existe, usa la lógica robusta de escaneo (GCS folder-by-folder).
+ * 3. Al finalizar el escaneo, guarda el resultado en 'history_index.json' para el futuro.
  */
 historyRouter.get("/", async (req, res) => {
   try {
@@ -22,6 +25,29 @@ historyRouter.get("/", async (req, res) => {
       return res.json([]);
     }
 
+    // =================================================================
+    // 1. FAST PATH: Intentar leer el Índice Maestro (Velocidad)
+    // =================================================================
+    const indexKey = "history_index.json";
+    try {
+      const hasIndex = await objectExists(indexKey);
+      if (hasIndex) {
+        // Leemos el caché y lo devolvemos rápido
+        const cached = await readJson<any[]>(indexKey);
+        if (Array.isArray(cached) && cached.length > 0) {
+          // console.log("[history] Serving from cache (fast)");
+          return res.json(cached);
+        }
+      }
+    } catch (err) {
+      console.warn("[history] Cache miss (leyendo GCS directo):", err);
+      // Si falla, no importa, continuamos con el "Slow Path"
+    }
+
+    // =================================================================
+    // 2. SLOW PATH: Tu Lógica Original (Robustez)
+    // =================================================================
+    
     // 1. Obtener lista de carpetas (rápido)
     const batchIds = await listEmailV2BatchIds();
 
@@ -105,6 +131,19 @@ historyRouter.get("/", async (req, res) => {
       const tb = b.createdAt ? Date.parse(b.createdAt) : 0;
       return tb - ta;
     });
+
+    // =================================================================
+    // 3. CACHE WARMING: Auto-generar el índice para la próxima vez
+    // =================================================================
+    try {
+        if (sanitized.length > 0) {
+            // Guardamos la lista procesada en el archivo índice
+            await uploadJson(indexKey, sanitized);
+            // console.log("[history] Cache index updated/created.");
+        }
+    } catch (saveErr) {
+        console.warn("[history] No se pudo guardar history_index.json", saveErr);
+    }
 
     res.json(sanitized);
   } catch (e: any) {

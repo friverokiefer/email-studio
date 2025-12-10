@@ -232,14 +232,10 @@ export function Email2Sidebar({
 
   // Cargar Historial (Optimizado con Loader)
   const refreshHistory = useCallback(async (silent = true) => {
-    // Si no es silencioso (ej: carga inicial), mostramos el loader local
+    // Si la lista está vacía, mostramos loading. Si ya tiene datos, silent update.
+    if (history.length === 0 && !silent) setIsHistoryLoading(true);
+    // Si se pide explícito (!silent), forzamos loading indicator
     if (!silent) setIsHistoryLoading(true);
-    
-    // Si es silencioso (ej: auto-update), podemos optar por no bloquear,
-    // pero para la carga inicial desde el botón "CARGAR" o mount, usamos true.
-    // Aquí forzamos true siempre que se llame explícitamente excepto en background.
-    // Ajuste: Para simplificar, usamos el loader si el historial está vacío o si se pide explícitamente.
-    if (history.length === 0) setIsHistoryLoading(true);
 
     try {
       const data = await listHistory("emails_v2");
@@ -249,11 +245,12 @@ export function Email2Sidebar({
     } finally {
       setIsHistoryLoading(false);
     }
-  }, [history.length]); // Dependencia segura
+  }, [history.length]);
 
   // Efecto de carga inicial
   useEffect(() => {
-    refreshHistory(true); 
+    // Primera carga: visible si está vacío, silenciosa si no
+    refreshHistory(false); 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); 
 
@@ -332,6 +329,7 @@ export function Email2Sidebar({
     if (!bid) return toast.error("ID no válido.");
     
     // Al cargar manual, activamos loader de historial para dar feedback visual
+    // Pero como ahora tenemos caché, esto será instantáneo en la 2da vez
     setIsHistoryLoading(true); 
     const toastId = toast.loading("Cargando lote...");
     
@@ -339,11 +337,14 @@ export function Email2Sidebar({
       const resp = await loadHistoryBatch(bid);
       setActiveBatchId(resp.batchId);
       onGenerated?.(resp);
+      
+      // Si fue muy rápido (caché), el toast loading casi no se ve.
       toast.success(`Lote ${resp.batchId} cargado`, { id: toastId });
       
       // Refrescamos la lista para asegurarnos que el lote aparezca
-      const data = await listHistory("emails_v2");
-      setHistory(data);
+      // (sin bloquear UI)
+      listHistory("emails_v2").then(setHistory).catch(() => {});
+
     } catch (e: any) {
       toast.error(`Error: ${e.message}`, { id: toastId });
     } finally {
@@ -372,7 +373,6 @@ export function Email2Sidebar({
     [state.cluster, availableClusters]
   );
 
-  // Variable de control para el select
   const isCampaignsListEmpty = availableCampaigns.length === 0 && !metaLoading;
   const campaignPlaceholder = metaLoading 
     ? "Cargando catálogo..." 

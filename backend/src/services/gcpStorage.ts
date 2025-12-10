@@ -150,7 +150,8 @@ export async function uploadBuffer(
   objectPath: string,
   buffer: Buffer,
   contentType?: string,
-  makePublic?: boolean
+  makePublic?: boolean,
+  cacheControl?: string
 ): Promise<{ gsUri: string; url?: string; consoleUrl?: string }> {
   const b = ensureBucket();
   const key = withPrefix(objectPath);
@@ -160,7 +161,10 @@ export async function uploadBuffer(
     resumable: false,
     validation: "crc32c",
     contentType: contentType || detectContentTypeByExt(key),
-    metadata: { cacheControl: "public, max-age=3600" },
+    metadata: { 
+      // Si no se especifica, usamos 1 hora. Para índices usamos no-cache.
+      cacheControl: cacheControl || "public, max-age=3600" 
+    },
   });
 
   const shouldPublic = makePublic ?? isPublic;
@@ -183,19 +187,19 @@ export async function uploadBuffer(
 export async function uploadFileFromDisk(
   localFilePath: string,
   objectPath: string,
-  opts?: { makePublic?: boolean; contentType?: string }
+  opts?: { makePublic?: boolean; contentType?: string; cacheControl?: string }
 ): Promise<{ gsUri: string; url?: string; consoleUrl?: string }> {
   if (!fs.existsSync(localFilePath)) {
     throw new Error(`❌ Archivo local no encontrado: ${localFilePath}`);
   }
   const buf = fs.readFileSync(localFilePath);
   const ct = opts?.contentType || detectContentTypeByExt(localFilePath);
-  return uploadBuffer(objectPath, buf, ct, opts?.makePublic);
+  return uploadBuffer(objectPath, buf, ct, opts?.makePublic, opts?.cacheControl);
 }
 
-export async function uploadJson(objectPath: string, data: unknown) {
+export async function uploadJson(objectPath: string, data: unknown, cacheControl?: string) {
   const json = Buffer.from(JSON.stringify(data, null, 2));
-  return uploadBuffer(objectPath, json, "application/json");
+  return uploadBuffer(objectPath, json, "application/json", undefined, cacheControl);
 }
 
 /* =========================

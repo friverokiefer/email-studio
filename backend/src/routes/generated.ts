@@ -22,8 +22,10 @@ async function resolveBatchJsonKey(batchId: string): Promise<string | null> {
   const basePrefix = `emails_v2/${batchId}/`;
   const canonical = `${basePrefix}batch.json`;
 
+  // 1. Camino feliz (el más probable)
   if (await objectExists(canonical)) return canonical;
 
+  // 2. Fallback: buscar otros nombres si no existe el estándar
   const all = await listFilesByPrefix(basePrefix);
   const jsons = all
     .filter((f) => f.name.toLowerCase().endsWith(".json"))
@@ -53,7 +55,8 @@ async function heroUrlForObjectKey(objectKey: string): Promise<string> {
     return publicObjectUrl(objectKey);
   }
   // Privado o estilo "direct": firmada o directa
-  return ensureReadUrl(objectKey, 15);
+  // OPTIMIZACIÓN: Aumentamos a 60 minutos para mejorar caché del navegador
+  return ensureReadUrl(objectKey, 60);
 }
 
 /** Completa images[].heroUrl con URL legible */
@@ -126,7 +129,8 @@ async function redirectObject(req: Request, res: Response) {
     const url =
       CFG.PUBLIC_READ && CFG.URL_STYLE === "console"
         ? publicObjectUrl(objectKey)
-        : await ensureReadUrl(objectKey, 10);
+        // OPTIMIZACIÓN: 60 minutos aquí también
+        : await ensureReadUrl(objectKey, 60);
 
     return res.redirect(302, url);
   } catch {

@@ -1,8 +1,24 @@
+// frontend/src/lib/historyLoader.ts
+
 import { API_BASE } from "@/lib/api";
 import { gcsDirectObjectUrl, gcsBatchJsonUrl, gcsManifestUrl } from "@/lib/gcsPaths";
 import type { GenerateV2Response } from "@/lib/apiEmailV2";
 
 const VITE_GCS_BUCKET = (import.meta as any).env?.VITE_GCS_BUCKET || "";
+
+// === MEJORA: Caché en memoria para navegación instantánea ===
+// Evita volver a descargar el JSON si el usuario va y vuelve entre lotes.
+const BATCH_CACHE = new Map<string, GenerateV2Response>();
+
+/**
+ * Permite actualizar la caché manualmente (ej: después de guardar cambios)
+ */
+export function updateBatchCache(batchId: string, data: Partial<GenerateV2Response>) {
+  const existing = BATCH_CACHE.get(batchId);
+  if (existing) {
+    BATCH_CACHE.set(batchId, { ...existing, ...data });
+  }
+}
 
 /** Reconstruye heroUrl estables a partir de fileName o heroUrl relativos */
 function normalizeImagesFromGCS(json: any, batchId: string) {
@@ -77,6 +93,13 @@ export function extractBatchId(raw: string): string | null {
 }
 
 export async function loadHistoryBatch(batchId: string): Promise<GenerateV2Response> {
+  // 1. FAST PATH: Si ya lo tenemos en RAM, devolverlo inmediatamente.
+  if (BATCH_CACHE.has(batchId)) {
+    // console.log(`[historyLoader] Cache hit for ${batchId}`);
+    return BATCH_CACHE.get(batchId)!;
+  }
+
+  // 2. Network Fetch
   const base = API_BASE || "";
   const backendUrl = `${base}/api/generated/emails_v2/${encodeURIComponent(batchId)}/batch.json?t=${Date.now()}`;
   
@@ -108,10 +131,15 @@ export async function loadHistoryBatch(batchId: string): Promise<GenerateV2Respo
     return [];
   })();
 
-  return {
+  const result: GenerateV2Response = {
     batchId: json.batchId || batchId,
     createdAt: json.createdAt,
     sets: setsFromJson,
     images: json.images || [],
   };
+
+  // 3. Guardar en caché para la próxima
+  BATCH_CACHE.set(batchId, result);
+
+  return result;
 }

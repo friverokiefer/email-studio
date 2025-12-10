@@ -4,6 +4,8 @@ import { toast } from "sonner";
 import { API_BASE as API_V2_BASE } from "@/lib/api";
 import type { EmailContentSet, PreviewData } from "@/components/Email2Workspace";
 import type { EmailV2Image } from "@/lib/apiEmailV2";
+// IMPORTANTE: Importamos para mantener sincronizada la caché
+import { updateBatchCache } from "@/lib/historyLoader";
 
 export function useEmailBatchState() {
   const [batchId, setBatchId] = useState<string>("");
@@ -94,6 +96,10 @@ export function useEmailBatchState() {
 
       // Sincronizar estado con lo guardado
       if (editedRef.current) setContentSets(editedRef.current);
+
+      // === MEJORA: Actualizar caché global para navegación rápida ===
+      updateBatchCache(batchId, { sets: effectiveSets });
+      
       toast.success("Ediciones guardadas correctamente.");
     } catch (e: any) {
       toast.error(e?.message || "Error al guardar.");
@@ -115,7 +121,7 @@ export function useEmailBatchState() {
     editedRef,
     // Setters
     setLivePreview,
-    setImages,        // 👈 nuevo: para actualizar imágenes (incluye las manuales)
+    setImages,
     // Actions
     handleGenerated,
     handleEditedChange,

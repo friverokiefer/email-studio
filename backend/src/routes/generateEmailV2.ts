@@ -20,6 +20,9 @@ import {
   IA_ENGINE_ENABLED,
 } from "../services/iaEngine";
 
+// [MEJORA] Importamos el servicio de índice (se creará en Parte B)
+import { addToHistoryIndex } from "../services/historyIndex";
+
 /* =========================
  * Tipos respuesta
  * ========================= */
@@ -504,6 +507,22 @@ generateEmailsV2Router.post("/", async (req, res) => {
         quality: x.meta?.quality,
       })),
     });
+
+    // ========================================================
+    // [MEJORA] Actualización del Historial "Instantáneo"
+    // ========================================================
+    // Llamamos al servicio para agregar este lote al top del index.
+    try {
+      await addToHistoryIndex({
+        batchId,
+        count: contentSets.length, // O max(contentSets.length, imagesOut.length)
+        createdAt,
+      });
+    } catch (idxErr) {
+      // Si falla la actualización del índice, no detenemos el request.
+      console.warn("[emails_v2] No se pudo actualizar history_index.json:", idxErr);
+    }
+    // ========================================================
 
     /* 4) Responder */
     if (!aborted) {
