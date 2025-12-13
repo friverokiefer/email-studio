@@ -296,6 +296,10 @@ export function Email2Sidebar({
         cluster: state.cluster,
         sets: state.setCount,
         images: state.imageCount,
+        // --- CAMBIOS CLAVE AQUI ---
+        temperature: state.temperature, 
+        imageQuality: state.imageQuality,
+        // --------------------------
         feedback: {
           subject: state.feedbackSubject || undefined,
           preheader: state.feedbackPreheader || undefined,
@@ -571,15 +575,15 @@ export function Email2Sidebar({
         </div>
       </Collapsible>
 
-      {/* 3. Configuración (Mantenido) */}
+      {/* 3. Configuración */}
       <Collapsible title="⚙️ Configuración">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4 mb-4">
           <div className="flex flex-col">
             <div className="flex items-center gap-1 mb-2 min-h-[2rem]">
               <label className="block text-xs font-bold text-slate-700 leading-tight">
-                Opciones de texto a generar
+                Opciones Texto
               </label>
-              <InfoTooltip text="Opciones distintas de texto a generar." />
+              <InfoTooltip text="Variantes de texto a generar." />
             </div>
             <StepperInput
               value={state.setCount}
@@ -597,6 +601,69 @@ export function Email2Sidebar({
               value={state.imageCount}
               onChange={(val) => setState((s) => ({ ...s, imageCount: val }))}
             />
+          </div>
+        </div>
+
+        {/* --- CONTROL DE CALIDAD IMAGEN --- */}
+        <div className="pt-3 border-t border-slate-100 mb-3">
+            <div className="flex items-center gap-1 mb-2">
+              <label className="text-xs font-bold text-slate-700">Calidad Imagen</label>
+              <InfoTooltip text="Mayor calidad implica mayor costo y tiempo de generación." />
+            </div>
+            
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { val: "low", label: "Baja", cost: "$" },
+                { val: "medium", label: "Media", cost: "$$" },
+                { val: "high", label: "Alta", cost: "$$$" },
+              ].map((opt) => (
+                <button
+                  key={opt.val}
+                  type="button"
+                  onClick={() => setState(s => ({ ...s, imageQuality: opt.val as any }))}
+                  className={`
+                    flex flex-col items-center justify-center py-2 rounded-lg border text-xs transition-all
+                    ${state.imageQuality === opt.val 
+                        ? "bg-sky-50 border-sky-500 text-sky-700 ring-1 ring-sky-500 shadow-sm" 
+                        : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"}
+                  `}
+                >
+                  <span className="font-semibold">{opt.label}</span>
+                  <span className="text-[10px] opacity-70 mt-0.5 font-mono font-bold text-slate-400">{opt.cost}</span>
+                </button>
+              ))}
+            </div>
+        </div>
+
+        {/* --- CONTROL DE TEMPERATURA --- */}
+        <div className="pt-3 border-t border-slate-100">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1">
+              <label className="text-xs font-bold text-slate-700">Creatividad IA</label>
+              <InfoTooltip text="Define qué tan predecible (Bajo) o creativo (Alto) será el texto." />
+            </div>
+            <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+              {state.temperature.toFixed(1)}
+            </span>
+          </div>
+          
+          <input
+            type="range"
+            min="0"
+            max="1.2"
+            step="0.1"
+            value={state.temperature}
+            onChange={(e) => {
+              const val = parseFloat(e.target.value);
+              setState(s => ({ ...s, temperature: val }));
+            }}
+            className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+          />
+          
+          <div className="flex justify-between text-[9px] text-slate-400 mt-1 font-medium uppercase tracking-wide">
+            <span>Preciso</span>
+            <span>Balanceado</span>
+            <span>Creativo</span>
           </div>
         </div>
       </Collapsible>

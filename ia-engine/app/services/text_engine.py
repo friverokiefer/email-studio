@@ -66,9 +66,15 @@ def generate_sets(request: GenerateRequest) -> Tuple[List[GeneratedVariant], Lis
     variants = []
     prompts_debug = []  # <--- NUEVO: Acumulador de prompts
 
-    # Leemos la temperatura creativa del entorno
-    # AJUSTE: Bajamos el default de 0.85 a 0.6 para asegurar consistencia en formato JSON y reglas negativas.
-    creative_temp = float(os.getenv("OPENAI_CREATIVE_TEMP", "0.7"))
+    # [LOGICA TEMPERATURA]
+    # 1. Preferencia: Valor enviado en el request (controlado por frontend)
+    # 2. Fallback: Variable de entorno o default 0.7
+    env_temp = float(os.getenv("OPENAI_CREATIVE_TEMP", "0.7"))
+
+    if request.temperature is not None:
+        creative_temp = request.temperature
+    else:
+        creative_temp = env_temp
 
     # Log con la temperatura real que se usará
     logger.info("Generando %d variantes para '%s' (Temp %.2f)",

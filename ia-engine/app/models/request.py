@@ -73,6 +73,14 @@ class GenerateRequest(BaseModel):
         ),
     )
 
+    # [NUEVO] Campo para controlar la creatividad
+    temperature: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=2.0,
+        description="Nivel de creatividad (0.0 = determinista, 1.0 = creativo/balanceado).",
+    )
+
     feedback: Optional[EmailFeedback] = Field(
         default=None,
         description="Feedback opcional del usuario (subject/preheader/bodyContent/body).",

@@ -1,14 +1,19 @@
 # ia-engine/app/utils/branding.py
 
 # ==========================================
-# 1. IDENTIDAD VISUAL V3.6 (Wider Shot & Pure Photography)
+# 1. IDENTIDAD VISUAL V4.0 (Refactor: Realism & Editorial Style)
 # ==========================================
 BICE_VISUAL_IDENTITY = (
-    "PHOTOGRAPHY STYLE: High-end cinematic advertising photography. 8k resolution. "
+    # CAMBIO 1: De "Advertising" a "Editorial" + Film Look
+    "PHOTOGRAPHY STYLE: High-end Editorial Photography. Analog Film Aesthetic. "
+    "FILM STOCK: Kodak Portra 400 (for natural skin tones and fine grain). "
+    "TEXTURE: Visible film grain, soft natural shadows. "
 
-    # AJUSTE DE CÁMARA: De 85mm (Zoom) a 35mm (Angular).
-    # Esto aleja la cámara y obliga a mostrar el entorno.
-    "CAMERA SPECS: Shot on 35mm lens. Environmental portrait style. "
+    # CAMBIO 2: Ajuste técnico de cámara con Apertura f/2.8
+    "CAMERA SPECS: Shot on 35mm prime lens. Aperture f/2.8. "
+    "FOCUS: Shallow depth of field. The background must be slightly out of focus (bokeh) "
+    "to separate the subjects from the environment naturally. "
+
     "COMPOSITION: Wide shot (Plano General) or Medium Shot. The subjects should take up about 30-40% of the frame, "
     "allowing the background/environment to be clearly visible and set the context. Avoid extreme close-ups. "
 
@@ -18,17 +23,35 @@ BICE_VISUAL_IDENTITY = (
     "LIGHTING: Golden Hour (soft, warm sunlight) or sophisticated bright natural light. The light acts as a narrative element. "
     "COMPOSITION: Candid moments, authentic emotions. Avoid stiff 'stock photo' poses. "
     "DEFAULT CONTEXT: High Net Worth / Upper Class lifestyle in Chile (Santiago/Vitacura/Sanhattan style). "
-    "COLORS: Corporate palette accents (Deep Navy Blue and Bright Cyan/Turquoise) integrated naturally in clothing or props."
+
+    "CLOTHING COLOR PALETTE: Neutral and Sophisticated (Beige, White, Light Grey, Navy, Earth tones). "
+    "Do NOT use bright Cyan or Turquoise on main clothing. "
+    "BRANDING COLORS (Deep Navy & Cyan) must appear ONLY in background elements, blurry lights, "
+    "or small accessories (like a phone case or a pen), NEVER as the main shirt/jacket color."
 )
 
-# AJUSTE CRÍTICO DE BLINDAJE DEMOGRÁFICO
+# ANCLAJE GEOGRÁFICO DEFAULT (Santiago)
+# Se usará por defecto, a menos que prompts.py detecte un contexto de naturaleza.
+BICE_GEO_ANCHOR = (
+    "GEOGRAPHIC ANCHOR: The background MUST resemble Santiago de Chile (Modern glass buildings + The Andes Mountains silhouette in the distance). "
+    "Even if the action is futuristic (like a flying car), the city layout and architecture must look Western/Latin American, NOT Cyberpunk Asian (No neon signs with Kanji, no dense Hong Kong style streets)."
+)
+
+# CAMBIO 3: Blindaje Demográfico con Imperfecciones Reales
 BICE_DEMOGRAPHIC_BASE = (
     "SUBJECTS IDENTITY (STRICT): "
     "The subjects are ALWAYS Chilean/Southern Cone people (Western-Latin phenotype). "
 
-    # 1. REGLA DE APARIENCIA
+    # 1. REGLA DE APARIENCIA + PIEL REAL
     "APPEARANCE: Sophisticated, elegant, and well-groomed. "
     "Physical traits: **Light to Medium-Olive skin tone (Mediterranean/Hispanic phenotype)**. "
+
+    # -- NUEVO: Textura de piel real para evitar efecto plástico --
+    "SKIN TEXTURE: Real skin with visible pores and slight natural imperfections. "
+    "Avoid 'wax figure' look. Avoid excessive smoothness. "
+    "EXPRESSIONS: Candid smiles, not frozen advertising smiles. "
+    # -------------------------------------------------------------
+
     "HAIR: Predominantly Dark Brown/Black. "
     "However, include Natural Blonde, Light Brown, or Red hair in a realistic proportion (approx 10-15% chance) to reflect the diversity of this segment. "
 
@@ -48,8 +71,6 @@ BICE_DEMOGRAPHIC_BASE = (
     "Do NOT generate disconnected characters (Zombie stare)."
 )
 
-# AJUSTE: Eliminamos la petición de logos y líneas.
-# Ahora forzamos "limpieza" para que tú pongas el logo manualmente después.
 BICE_GRAPHIC_OVERLAY = (
     "CLEAN IMAGE RULE: NO text, NO logos, NO watermarks, NO graphic overlays, NO blue waves. "
     "Pure photography only. Keep the image clean for post-production."
@@ -82,6 +103,7 @@ BICE_TEXT_STRUCTURE_BASE = (
 __all__ = [
     "BICE_VISUAL_IDENTITY",
     "BICE_DEMOGRAPHIC_BASE",
+    "BICE_GEO_ANCHOR",
     "BICE_TEXT_TONE",
     "BICE_TEXT_CONSTRAINTS",
     "BICE_TEXT_STRUCTURE_BASE",

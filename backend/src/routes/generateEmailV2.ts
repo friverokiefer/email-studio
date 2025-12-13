@@ -238,15 +238,26 @@ generateEmailsV2Router.post("/", async (req, res) => {
   });
 
   try {
-    const { campaign, cluster, sets, images, feedback } = req.body || {};
+    // 1. Extraer todos los parámetros incluyendo temperature y imageQuality
+    const { campaign, cluster, sets, images, feedback, temperature, imageQuality } = req.body || {};
+    
     const setCount = Math.max(1, Math.min(5, Number(sets) || 1));
     const imageCount = Math.max(1, Math.min(5, Number(images) || 2));
+
+    // Validar / Normalizar Temperature
+    let safeTemp: number | undefined = undefined;
+    if (typeof temperature === 'number') {
+        // Limitamos entre 0 y 1.2 para evitar alucinaciones excesivas
+        safeTemp = Math.max(0, Math.min(1.2, temperature)); 
+    }
 
     console.log("[emails_v2] incoming:", {
       campaign,
       cluster,
       setCount,
       imageCount,
+      temperature: safeTemp,
+      imageQuality, // <--- Log para debug
       hasFeedback: !!feedback,
       iaEngineEnabled: IA_ENGINE_ENABLED,
     });
@@ -314,6 +325,7 @@ generateEmailsV2Router.post("/", async (req, res) => {
         versionIndex: i,
         promptHint: normalizedFeedback?.bodyContent || undefined,
         mode: "cover",
+        quality: imageQuality, // <--- PASAMOS LA CALIDAD
       });
       
       const t1 = Date.now();
@@ -389,11 +401,12 @@ generateEmailsV2Router.post("/", async (req, res) => {
       try {
         console.log("[emails_v2] usando IA Engine externo (Python) para textos…");
 
-        // <--- NUEVO: Desestructuramos sets y metadata
+        // <--- CAMBIO: Pasamos temperature al servicio
         const { sets: iaSets, metadata: iaMetadata } = await generateEmailSetsViaIAEngine({
           campaign,
           cluster,
           setCount,
+          temperature: safeTemp, 
           feedback: feedbackWithHero,
         });
 

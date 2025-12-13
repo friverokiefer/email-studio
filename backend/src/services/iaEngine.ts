@@ -83,6 +83,7 @@ export async function generateEmailSetsViaIAEngine(params: {
   campaign: string;
   cluster: string;
   setCount: number;
+  temperature?: number; // <--- NUEVO: Parámetro opcional
   feedback?: IaEngineFeedback;
 }): Promise<{ sets: EmailSetLike[]; metadata: any }> {
   
@@ -95,6 +96,7 @@ export async function generateEmailSetsViaIAEngine(params: {
     campaign: params.campaign,
     cluster: params.cluster,
     sets: params.setCount,
+    temperature: params.temperature, // <--- NUEVO: Se envía al microservicio Python
     feedback: params.feedback ?? undefined,
   };
 

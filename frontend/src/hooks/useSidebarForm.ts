@@ -14,6 +14,8 @@ export type Email2SidebarState = {
   feedbackBody: string;
   setCount: number;
   imageCount: number;
+  temperature: number; // <--- Estado para temperatura
+  imageQuality: "low" | "medium" | "high"; // <--- NUEVO: Estado para calidad imagen
 };
 
 const FORM_TYPE = "email_v2";
@@ -27,6 +29,8 @@ export function useSidebarForm() {
     feedbackBody: "",
     setCount: 3,
     imageCount: 2,
+    temperature: 0.7, // Default "Balanceado"
+    imageQuality: "low", // <--- NUEVO: Default "Bajo/Económico"
   });
 
   const [meta, setMeta] = useState<MetaData | null>(null);
@@ -42,6 +46,19 @@ export function useSidebarForm() {
           stored.setCount = Math.max(1, Math.min(5, stored.setCount));
         if (typeof stored.imageCount === "number")
           stored.imageCount = Math.max(1, Math.min(5, stored.imageCount));
+        
+        // Recuperar temperatura si existe
+        if (typeof stored.temperature === "number") {
+             stored.temperature = Math.max(0, Math.min(1.2, stored.temperature));
+        }
+
+        // <--- NUEVO: Recuperar calidad de imagen si es válida
+        if (["low", "medium", "high"].includes(stored.imageQuality as any)) {
+            // ok, mantiene el valor
+        } else {
+            stored.imageQuality = "low"; // Fallback seguro
+        }
+
         setState((prev) => ({ ...prev, ...stored }));
       }
     } catch {

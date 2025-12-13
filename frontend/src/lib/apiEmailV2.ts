@@ -24,6 +24,8 @@ export type GenerateV2Payload = {
   cluster: string;
   sets: number; // 1..5
   images?: number; // 1..5
+  temperature?: number; // <--- NUEVO: Control de Creatividad (0.0 a 1.2)
+  imageQuality?: "low" | "medium" | "high" | "auto"; // <--- NUEVO: Control de Calidad Imagen
   feedback?: EmailV2Feedback;
 };
 
@@ -34,8 +36,8 @@ export type GenerateV2Payload = {
  * - CTA opcional
  *
  * Debe calzar con:
- *  - backend/src/services/iaEngine.ts → EmailSetLike
- *  - ia-engine/app/models/response.py → GeneratedVariant
+ * - backend/src/services/iaEngine.ts → EmailSetLike
+ * - ia-engine/app/models/response.py → GeneratedVariant
  */
 export type EmailContentSet = {
   id: number; // 1..N

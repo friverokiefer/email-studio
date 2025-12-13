@@ -16,8 +16,9 @@ async function writeBuffer(p: string, buf: Buffer) {
 
 /** Tipos utilitarios estrictos */
 type ImageSizeUnion = "1536x1024" | "1024x1024" | "1024x1536";
-// AJUSTE: Actualizado a los valores soportados por tu API
-type ImageQualityUnion = "medium" | "high" | "low" | "auto";
+
+// AJUSTE: Exportamos para usar en rutas y definimos los niveles soportados
+export type ImageQualityUnion = "medium" | "high" | "low" | "auto";
 
 /** 🔧 Selector de tamaño */
 function pickSizeForModel(raw?: string): ImageSizeUnion {
@@ -25,6 +26,14 @@ function pickSizeForModel(raw?: string): ImageSizeUnion {
   const allowed: ImageSizeUnion[] = ["1536x1024", "1024x1024", "1024x1536"];
   const incoming = (raw || "").trim() as ImageSizeUnion;
   return allowed.includes(incoming) ? incoming : defaultSize;
+}
+
+/** 🔧 Selector de Calidad (NUEVO) */
+// Por defecto usamos "low" como solicitaste para el nivel más bajo/económico
+function pickQuality(raw?: string): ImageQualityUnion {
+  const allowed: ImageQualityUnion[] = ["medium", "high", "low", "auto"];
+  const incoming = (raw || "").trim() as ImageQualityUnion;
+  return allowed.includes(incoming) ? incoming : "low";
 }
 
 /** =========================
@@ -128,6 +137,7 @@ export async function generateHeroPNG({
   versionIndex,
   promptHint,
   mode = "cover",
+  quality, // <--- NUEVO: Recibe parámetro de calidad
 }: {
   campaign: string;
   cluster: string;
@@ -135,11 +145,13 @@ export async function generateHeroPNG({
   versionIndex: number;
   promptHint?: string;
   mode?: NormalizeMode;
+  quality?: string; // string que será validado internamente
 }) {
   const client = getOpenAI();
   
   const MODEL = "gpt-image-1";
-  const QUALITY: ImageQualityUnion = "medium"; 
+  // Usamos el helper para definir la calidad (default "low")
+  const QUALITY: ImageQualityUnion = pickQuality(quality); 
   const SIZE: ImageSizeUnion = pickSizeForModel(process.env.IMAGE_SIZE); 
   
   // <--- CAMBIO CRÍTICO: Pedimos el prompt al servicio de IA en Python
@@ -175,7 +187,7 @@ export async function generateHeroPNG({
           model: MODEL,
           prompt: prompt, // Usamos el prompt traído de Python
           size: SIZE,
-          quality: QUALITY,
+          quality: QUALITY, // <--- Usamos la variable dinámica
           n: 1,
         }),
         PER_ATTEMPT_TIMEOUT,

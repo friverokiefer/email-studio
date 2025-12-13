@@ -3,8 +3,7 @@
 
 from __future__ import annotations
 from typing import Tuple, Any
-
-# Se eliminó "import json" porque no se usaba (Fix Pylint W0611)
+import random
 
 from app.utils.branding import (
     BICE_TEXT_TONE,
@@ -12,6 +11,7 @@ from app.utils.branding import (
     BICE_TEXT_STRUCTURE_BASE,
     BICE_VISUAL_IDENTITY,
     BICE_DEMOGRAPHIC_BASE,
+    BICE_GEO_ANCHOR,
     BICE_GRAPHIC_OVERLAY
 )
 from app.utils.campaigns import normalize_campaign
@@ -51,7 +51,6 @@ def _json_only_clause() -> str:
 def _extract_feedback_text(feedback: Any) -> str:
     """
     Extrae y combina el feedback del usuario (Subject, Preheader, Body).
-    CORRECCIÓN: Ahora incluye explícitamente el 'preheader' que antes se ignoraba.
     """
     if not feedback:
         return ""
@@ -62,24 +61,19 @@ def _extract_feedback_text(feedback: Any) -> str:
         if isinstance(feedback, dict):
             if f := feedback.get("subject"):
                 parts.append(f"Subject Idea: {f}")
-            # --- NUEVO: Captura explícita del preheader ---
             if f := feedback.get("preheader"):
                 parts.append(f"Preheader Idea: {f}")
-            # ----------------------------------------------
             if f := feedback.get("bodyContent") or feedback.get("body"):
                 parts.append(f"Content Focus: {f}")
         else:
             if getattr(feedback, "subject", None):
                 parts.append(f"Subject Idea: {feedback.subject}")
-            # --- NUEVO: Captura explícita del preheader ---
             if getattr(feedback, "preheader", None):
                 parts.append(f"Preheader Idea: {feedback.preheader}")
-            # ----------------------------------------------
             if getattr(feedback, "bodyContent", None):
                 parts.append(f"Content Focus: {feedback.bodyContent}")
         return " | ".join(parts)
-    except Exception:  # pylint: disable=broad-exception-caught
-        # Capturamos todo para evitar romper el flujo por un error de formato en el feedback opcional
+    except Exception:
         return str(feedback)
 
 
@@ -99,17 +93,17 @@ def _extract_visual_feedback(feedback: Any) -> str | None:
         if text and len(text) > 5:
             return text
         return None
-    except Exception:  # pylint: disable=broad-exception-caught
+    except Exception:
         return None
 
 
 def _get_consistent_structure(campaign: str) -> str:
     """
-    Define la estructura con 'Creatividad Controlada' y más flexibilidad para omitir listas.
+    Define la estructura con 'Creatividad Controlada'.
     """
     camp_lower = campaign.lower()
 
-    # GRUPO 1: Productos Complejos / Serios (Inversiones, Hipotecarios, etc)
+    # GRUPO 1: Productos Complejos / Serios
     complex_products = ["inversión", "fondo",
                         "hipotecario", "dap", "vida", "seguro"]
 
@@ -120,37 +114,48 @@ def _get_consistent_structure(campaign: str) -> str:
             "OPCIONES PARA EL CUERPO (Elige la mejor para este texto):\n"
             "A) Lista de 3 a 5 puntos usando guiones '-' (Ideal para enumerar características o beneficios técnicos).\n"
             "B) Narrativa fluida de 2-3 párrafos (Ideal si el mensaje es emocional o de 'tranquilidad').\n"
-            "Decisión Crítica: Si la longitud del cuerpo es corta (menos de 6 líneas), favorece la narrativa (B) para que el correo no se vea mecanizado. Prioriza la claridad sobre la formalidad."
+            "Decisión Crítica: Si la longitud del cuerpo es corta (menos de 6 líneas), favorece la narrativa (B) para que el correo no se vea mecanizado."
         )
 
-    # GRUPO 2: Productos Ágiles / Consumo (Tarjetas, Apps, Go Bice)
+    # GRUPO 2: Productos Ágiles / Consumo
     return (
         "ESTILO DE CUERPO: 'Ágil y Directo'.\n"
         "Estructura Sugerida: Gancho corto + CUERPO DINÁMICO + Cierre rápido.\n"
         "OPCIONES PARA EL CUERPO (Elige la mejor):\n"
-        "A) Lista corta de 2 a 3 puntos clave usando guiones '-' (Para beneficios directos como descuentos).\n"
-        "B) Texto fluido, un párrafo corto y potente (Para invitaciones rápidas o mensajes de estilo de vida).\n"
-        "Decisión Crítica: Si el mensaje se puede decir de forma concisa en un párrafo, omite la lista. "
-        "Objetivo: Ser conciso (Skimmable content)."
+        "A) Lista corta de 2 a 3 puntos clave usando guiones '-' (Para beneficios directos).\n"
+        "B) Texto fluido, un párrafo corto y potente (Para invitaciones rápidas).\n"
+        "Decisión Crítica: Si el mensaje se puede decir de forma concisa en un párrafo, omite la lista. Objetivo: Ser conciso."
     )
 
 
 def _detect_subject_age(cluster: str) -> str:
-    """
-    Determina la edad aproximada del sujeto para consistencia visual.
-    """
+    """Determina la edad aproximada del sujeto."""
     c_lower = cluster.lower()
 
-    # 1. Joven / Universitario / Go Bice / Primer auto
     if any(x in c_lower for x in ["go bice", "universitaria", "joven", "moto", "primera vivienda"]):
         return "Young adults (20-28 years old), stylish university students or young professionals"
 
-    # 2. Senior / Consolidado
     if any(x in c_lower for x in ["senior", "inversión", "alta renta", "patrimonio", "empresa"]):
         return "Mature adults (40-55 years old), sophisticated and established business people"
 
-    # 3. Default (Adulto joven/medio)
     return "Adults (30-45 years old), stylish and successful"
+
+
+def _get_random_facial_traits() -> str:
+    """Inyecta diversidad y textura de piel real."""
+    male_traits = [
+        "clean shaven face", "short well-groomed beard", "designer stubble",
+        "wearing stylish wire-frame glasses", "no glasses", "strong jawline"
+    ]
+    female_traits = [
+        "wavy dark hair", "straight hair", "hair tied back elegantly",
+        "shoulder-length hair", "wearing minimal gold jewelry", "wearing stylish glasses"
+    ]
+
+    trait_m = random.choice(male_traits)
+    trait_f = random.choice(female_traits)
+
+    return f"Subject details: Male subject has {trait_m}. Female subject has {trait_f}. Both have natural skin textures."
 
 
 def build_email_prompt(campaign: str, cluster: str, feedback: Any = None, variant_index: int = 1) -> Tuple[str, str]:
@@ -158,17 +163,12 @@ def build_email_prompt(campaign: str, cluster: str, feedback: Any = None, varian
     official_benefits = BENEFITS.get(normalized_camp, [])
     approved_ctas = CTAS.get(normalized_camp, [])
 
-    # AQUI ESTÁ LA MEJORA: feedback_str ahora contiene el "Preheader Idea"
     feedback_str = _extract_feedback_text(feedback)
-
     cluster_desc = describe_cluster(cluster, normalized_camp)
-
-    # Inyectamos la estructura FLEXIBLE basada en campaña
     dynamic_body_rules = _get_consistent_structure(normalized_camp)
 
     system = (
         f"{BICE_TEXT_TONE}\n\n"
-        # REGLA DE IDIOMA
         f"IDIOMA DE SALIDA: Español de Chile (Neutro y formal).\n\n"
         f"{BICE_TEXT_STRUCTURE_BASE}\n"
         f"{dynamic_body_rules}\n\n"
@@ -205,7 +205,39 @@ def build_image_prompt(campaign: str, cluster: str, feedback: Any = None) -> str
     # 1. Definir EDAD del sujeto (Lógica de Segmento)
     subject_age_desc = _detect_subject_age(cluster)
 
-    # 2. Definir ESCENA
+    # 2. Inyectar Variabilidad Facial (Anti-Clones)
+    random_traits = _get_random_facial_traits()
+
+    # =========================================================================
+    # NUEVA LÓGICA: SELECCIÓN DINÁMICA DE GEOGRAFÍA (Fix "Sur + Edificios")
+    # =========================================================================
+    # Detectamos si el usuario está pidiendo explícitamente un entorno natural
+    # para evitar poner rascacielos de Santiago en medio de un bosque.
+    keywords_nature = [
+        "sur de chile", "campo", "lago", "playa", "bosque",
+        "naturaleza", "villarrica", "pucon", "patagonia", "rio", "montaña", "outdoor"
+    ]
+
+    is_nature_context = False
+    if user_visual_request:
+        is_nature_context = any(k in user_visual_request.lower()
+                                for k in keywords_nature)
+
+    if is_nature_context:
+        # Anclaje alternativo para naturaleza:
+        # Elimina edificios de cristal, prioriza madera, verde y luz difusa.
+        current_geo_anchor = (
+            "GEOGRAPHIC CONTEXT: Southern Chile landscape. Native temperate rainforest, "
+            "wooden textures, green mountains. NO glass skyscrapers. "
+            "Weather: Cloudy or soft sunlight (diffused light)."
+        )
+    else:
+        # Usamos el default de Santiago (BICE_GEO_ANCHOR original definido en branding.py)
+        # Esto asegura edificios modernos y cordillera de fondo para contextos urbanos.
+        current_geo_anchor = BICE_GEO_ANCHOR
+    # =========================================================================
+
+    # 3. Definir ESCENA (Action/Context)
     scene_description = ""
 
     if user_visual_request:
@@ -236,7 +268,7 @@ def build_image_prompt(campaign: str, cluster: str, feedback: Any = None) -> str
         scene_description = f"engaged in an activity depicting: '{user_visual_request}'{safety_suffix}."
 
     else:
-        # --- LÓGICA AUTOMÁTICA POR CAMPAÑA (Se mantiene igual, solo mejoramos textos de viaje) ---
+        # --- LÓGICA AUTOMÁTICA POR CAMPAÑA (Preservamos TODA tu lógica original) ---
 
         # --- EMPRESAS ---
         if "empresa" in camp_lower or "negocio" in c_lower:
@@ -307,12 +339,15 @@ def build_image_prompt(campaign: str, cluster: str, feedback: Any = None) -> str
         else:
             scene_description = "in a blurred modern architectural background, engaging with the camera with a confident smile."
 
-    # 3. ENSAMBLAJE FINAL
-    # Nota: Insertamos subject_age_desc para que la edad se respete antes de la demografía base
+    # 3. ENSAMBLAJE FINAL ESTRATÉGICO
+    # Orden: Specs -> GEO (Contexto DINÁMICO) -> SUJETOS (Identidad + Variabilidad) -> ACCIÓN -> ROPA -> BRANDING
     prompt = (
         f"{BICE_VISUAL_IDENTITY} "
-        f"MAIN SUBJECTS: {subject_age_desc}. {BICE_DEMOGRAPHIC_BASE} "
+        # AQUI OCURRE LA MAGIA: Usamos la variable calculada en vez de la constante fija
+        f"{current_geo_anchor} "
+        f"MAIN SUBJECTS: {subject_age_desc}. {random_traits}. {BICE_DEMOGRAPHIC_BASE} "
         f"ACTION/CONTEXT: The subjects are {scene_description} "
+        "CLOTHING RULE: Subjects wear Smart Casual Luxury in NEUTRAL tones (White, Beige, Navy). NO Cyan clothing. "
         f"BRANDING: {BICE_GRAPHIC_OVERLAY}"
     )
 
