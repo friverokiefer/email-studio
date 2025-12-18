@@ -85,9 +85,8 @@ export function useSidebarForm() {
     const loadMetaBypassingApi = async () => {
       setMetaLoading(true);
       
-      // TRUCO: Usamos /api explícito basado en tus curls exitosos.
-      // Añadimos 'nocache' con timestamp para forzar status 200 y evitar el 304.
-      const endpoint = "/api/email-v2/meta"; 
+      // ✅ CAMBIO: Usar la ruta que funciona correctamente
+      const endpoint = "/api/campaigns"; 
       const url = `${endpoint}?nocache=${Date.now()}`;
 
       console.log(`🚀 [useSidebarForm] Iniciando Fetch Nativo a: ${url}`);
