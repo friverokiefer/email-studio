@@ -22,7 +22,8 @@ import { CFG } from "./services/gcpStorage";
 
 const app = express();
 
-app.use(express.json({ limit: "10mb" }));
+// Aumentamos el límite del body para recibir imágenes grandes si fuera necesario
+app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // ===================== CORS ==========================
@@ -82,12 +83,11 @@ app.use("/api/history", historyRouter);
 app.use("/api/campaigns", metaEmailV2Router);
 
 // RUTA CRÍTICA: La que usa el hook de React sin el prefijo /api.
-// Corregimos el error 404: '/email-v2/meta' (singular)
 app.use("/email-v2/meta", metaEmailV2Router); 
 
 // Catálogo / Meta (Soportando todas las variantes que el hook podría usar):
-app.use("/api/email-v2/meta", metaEmailV2Router); // Preferida por convención
-app.use("/api/emails-v2", metaEmailV2Router); // Plural legacy
+app.use("/api/email-v2/meta", metaEmailV2Router); 
+app.use("/api/emails-v2", metaEmailV2Router); 
 
 // Carga manual de imágenes:
 app.use("/api/email-v2", emailV2ManualImageRouter);
@@ -128,20 +128,31 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 // ======================================================
-// 5. Arranque del servidor
+// 5. Arranque del servidor con AJUSTE DE SOCKETS
 // ======================================================
 
 const port = Number(process.env.PORT) || 8080;
 
-// Capturamos la instancia del servidor para configurar el timeout
 const server = app.listen(port, () => {
   console.log(`✅ email-studio backend escuchando en puerto ${port}`);
   console.log(`   NODE_ENV=${process.env.NODE_ENV || "undefined"}`);
 });
 
-// 🚀 CRÍTICO: Aumentar el timeout del servidor Node.js
-// Por defecto es 2-3 minutos. Lo subimos a 15 minutos (900,000 ms)
-// para soportar la generación de 5 imágenes en alta calidad.
+// =================================================================
+// 🔧 AJUSTE CRÍTICO DE TIMEOUTS PARA CLOUD RUN Y CARGAS PESADAS
+// =================================================================
+
+// 1. Timeout de la Lógica de Aplicación: 15 Minutos (900s)
+// Esto permite que tu función espere a la IA sin lanzar error de código.
 server.setTimeout(900000); 
+
+// 2. Timeout de Keep-Alive (Infraestructura): 910s
+// IMPORTANTE: Debe ser MAYOR que el timeout del Load Balancer (que suele ser el timeout de Cloud Run).
+// Si no pones esto, Google corta la conexión silenciosamente aunque server.setTimeout sea alto.
+server.keepAliveTimeout = 910000; 
+
+// 3. Timeout de Headers: 920s
+// Node.js requiere que headersTimeout sea mayor que keepAliveTimeout.
+server.headersTimeout = 920000;
 
 export default app;
