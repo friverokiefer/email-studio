@@ -133,9 +133,15 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 
 const port = Number(process.env.PORT) || 8080;
 
-app.listen(port, () => {
+// Capturamos la instancia del servidor para configurar el timeout
+const server = app.listen(port, () => {
   console.log(`✅ email-studio backend escuchando en puerto ${port}`);
   console.log(`   NODE_ENV=${process.env.NODE_ENV || "undefined"}`);
 });
+
+// 🚀 CRÍTICO: Aumentar el timeout del servidor Node.js
+// Por defecto es 2-3 minutos. Lo subimos a 15 minutos (900,000 ms)
+// para soportar la generación de 5 imágenes en alta calidad.
+server.setTimeout(900000); 
 
 export default app;
