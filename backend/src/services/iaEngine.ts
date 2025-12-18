@@ -55,7 +55,7 @@ console.log(`[iaEngine] Configurado con URL: ${IA_ENGINE_BASE_URL}`);
 async function fetchWithTimeout(
   resource: string,
   options: any = {},
-  timeoutMs = 120000 // Aumentado a 120s para dar margen a generación de imágenes
+  timeoutMs = 600000 // ✅ CAMBIO: Aumentado a 600s (10 min) para procesos largos con imágenes
 ) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
@@ -116,7 +116,7 @@ export async function generateEmailSetsViaIAEngine(params: {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       },
-      120000 // Timeout específico para texto (120s es seguro)
+      600000 // ✅ CAMBIO: Timeout de 600s (10 min) para generación completa con imágenes
     );
   } catch (netErr: any) {
     console.error("[iaEngine] Network Error:", netErr.message);

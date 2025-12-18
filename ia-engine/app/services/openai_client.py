@@ -35,12 +35,13 @@ MODEL_JSON = (
     or "gpt-4o"
 )
 
-# Defaults
+# ✅ CAMBIOS: Timeouts aumentados para operaciones largas
 DEFAULT_TEMP = float(os.getenv("OPENAI_TEXT_TEMP", "0.7"))
 DEFAULT_TOP_P = float(os.getenv("OPENAI_TEXT_TOP_P", "0.9"))
 DEFAULT_MAX_TOKENS = int(os.getenv("OPENAI_TEXT_MAX_TOKENS", "1000"))
-REQUEST_TIMEOUT = float(os.getenv("OPENAI_REQUEST_TIMEOUT", "45"))
-MAX_RETRIES = int(os.getenv("OPENAI_MAX_RETRIES", "2"))
+REQUEST_TIMEOUT = float(
+    os.getenv("OPENAI_REQUEST_TIMEOUT", "120"))  # ✅ 45s → 120s
+MAX_RETRIES = int(os.getenv("OPENAI_MAX_RETRIES", "3"))  # ✅ 2 → 3 reintentos
 
 _client: Optional[OpenAI] = None
 
@@ -65,9 +66,10 @@ def _get_client() -> OpenAI:
     )
 
     try:
-        client_timeout = float(os.getenv("OPENAI_CLIENT_TIMEOUT", "60"))
+        # ✅ CAMBIO: Timeout del cliente aumentado de 60s → 180s
+        client_timeout = float(os.getenv("OPENAI_CLIENT_TIMEOUT", "180"))
     except ValueError:
-        client_timeout = 60.0
+        client_timeout = 180.0
 
     kwargs: Dict[str, Any] = {
         "api_key": api_key,
@@ -79,7 +81,11 @@ def _get_client() -> OpenAI:
         kwargs["base_url"] = base_url
 
     _client = OpenAI(**kwargs)
-    logger.info("IA-Engine: cliente OpenAI inicializado (target=%s)", MODEL_JSON)
+    logger.info(
+        "IA-Engine: cliente OpenAI inicializado (target=%s, timeout=%ds)",
+        MODEL_JSON,
+        int(client_timeout)
+    )
     return _client
 
 
@@ -91,7 +97,7 @@ def chat_json(
 ) -> Dict[str, Any]:
     """
     Llama a Chat Completions esperando un JSON.
-    Acepta kwargs (temperature, top_p) para override dinámico.
+    Acepta kwargs (temperature, top_p, timeout) para override dinámico.
     """
     client = _get_client()
 
@@ -107,8 +113,8 @@ def chat_json(
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             logger.debug(
-                "IA-Engine: OpenAI Call (model=%s, temp=%.2f, attempt=%d/%d)",
-                m, t, attempt, MAX_RETRIES
+                "IA-Engine: OpenAI Call (model=%s, temp=%.2f, timeout=%ds, attempt=%d/%d)",
+                m, t, int(to), attempt, MAX_RETRIES
             )
 
             resp = client.chat.completions.create(
@@ -129,7 +135,12 @@ def chat_json(
 
             # Validación de modelo real
             used_model = resp.model
-            logger.info("✅ OpenAI Success: Modelo usado: %s", used_model)
+            logger.info(
+                "✅ OpenAI Success: Modelo usado: %s (tokens: prompt=%s, completion=%s)",
+                used_model,
+                resp.usage.prompt_tokens if resp.usage else "?",
+                resp.usage.completion_tokens if resp.usage else "?"
+            )
 
             content = resp.choices[0].message.content or "{}"
             try:
@@ -144,13 +155,13 @@ def chat_json(
             last_err = exc
             logger.warning(
                 "IA-Engine: Error OpenAI (attempt %d/%d): %s",
-                attempt, MAX_RETRIES, exc
+                attempt, MAX_RETRIES, str(exc)[:200]
             )
             if attempt >= MAX_RETRIES:
                 break
 
     msg = f"IA-Engine: Falló llamada a OpenAI tras {MAX_RETRIES} intentos"
-    logger.error(msg)
+    logger.error("%s. Último error: %s", msg, str(last_err)[:300])
     raise RuntimeError(msg) from last_err
 
 
