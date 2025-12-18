@@ -78,6 +78,9 @@ app.get("/env-check", (_req: Request, res: Response) => {
 // Historial de lotes
 app.use("/api/history", historyRouter);
 
+// NUEVA RUTA: Para que el frontend encuentre las campañas en /api/campaigns
+app.use("/api/campaigns", metaEmailV2Router);
+
 // RUTA CRÍTICA: La que usa el hook de React sin el prefijo /api.
 // Corregimos el error 404: '/email-v2/meta' (singular)
 app.use("/email-v2/meta", metaEmailV2Router); 
