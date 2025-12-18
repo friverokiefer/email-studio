@@ -47,7 +47,7 @@ WORKDIR /usr/share/nginx/html
 COPY --from=build /app/dist ./ 
 
 # Configuración Nginx con soporte para variables de entorno (Templates)
-COPY nginx.conf /etc/nginx/templates/default.conf.template
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 8080
 
