@@ -4,25 +4,25 @@ steps:
     args:
       - build
       - -t
-      - gcr.io/$PROJECT_ID/email-studio-backend:latest
+      - gcr.io/$PROJECT_ID/mail-studio-back:latest
       - ./backend
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - push
-      - gcr.io/$PROJECT_ID/email-studio-backend:latest
+      - gcr.io/$PROJECT_ID/mail-studio-back:latest
 
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
       - run
       - deploy
-      - email-studio-backend
+      - mail-studio-back
       - --image
-      - gcr.io/$PROJECT_ID/email-studio-backend:latest
+      - gcr.io/$PROJECT_ID/mail-studio-back:latest
       - --platform
       - managed
       - --region
-      - europe-west1
+      - southamerica-west1
       - --allow-unauthenticated
       - --port
       - "8080"
@@ -30,58 +30,51 @@ steps:
       - 512Mi
       - --cpu
       - "1"
-      # Si quieres luego puedes añadir:
-      # - --set-env-vars
-      # - GCP_BUCKET_NAME=poc-ai-martech-sandbox,GCP_PREFIX=dev
 
-  # ===== FRONTEND (Docker + NGINX) =====
+  # ===== FRONTEND =====
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - build
       - -t
-      - gcr.io/$PROJECT_ID/email-studio-frontend:latest
+      - gcr.io/$PROJECT_ID/mail-studio-frontend:latest
       - --build-arg
       - VITE_API_BASE=$_FRONT_VITE_API_BASE
       - --build-arg
       - VITE_GCS_BUCKET=$_FRONT_VITE_GCS_BUCKET
       - --build-arg
       - VITE_GCS_PREFIX=$_FRONT_VITE_GCS_PREFIX
-      - --build-arg
-      - VITE_SFMC_CATEGORY_ID=$_FRONT_VITE_SFMC_CATEGORY_ID
       - ./frontend
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - push
-      - gcr.io/$PROJECT_ID/email-studio-frontend:latest
+      - gcr.io/$PROJECT_ID/mail-studio-frontend:latest
 
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
       - run
       - deploy
-      - email-studio-frontend
+      - mail-studio-frontend
       - --image
-      - gcr.io/$PROJECT_ID/email-studio-frontend:latest
+      - gcr.io/$PROJECT_ID/mail-studio-frontend:latest
       - --platform
       - managed
       - --region
-      - europe-west1
+      - southamerica-west1
       - --allow-unauthenticated
       - --port
       - "8080"
       - --memory
-      - 256Mi
+      - 1Gi
       - --cpu
       - "1"
 
 substitutions:
-  # URL pública del backend vista por el frontend
-  _FRONT_VITE_API_BASE: "https://backend-151554496273.europe-west1.run.app"
-  # Bucket y prefix que ya comprobaste que funcionan en local
+  # URL REAL DE TU BACKEND EN SANTIAGO
+  _FRONT_VITE_API_BASE: "https://mail-studio-back-151554496273.southamerica-west1.run.app"
   _FRONT_VITE_GCS_BUCKET: "poc-ai-martech-sandbox"
   _FRONT_VITE_GCS_PREFIX: "dev"
-  _FRONT_VITE_SFMC_CATEGORY_ID: "239156"
 
 images:
-  - "gcr.io/$PROJECT_ID/email-studio-backend:latest"
-  - "gcr.io/$PROJECT_ID/email-studio-frontend:latest"
+  - "gcr.io/$PROJECT_ID/mail-studio-back:latest"
+  - "gcr.io/$PROJECT_ID/mail-studio-frontend:latest"
