@@ -9,6 +9,7 @@ import { useSfmcDraftSender } from "@/hooks/useSfmcDraftSender";
 import { Email2Sidebar } from "@/components/Email2Sidebar";
 import { Email2Workspace } from "@/components/Email2Workspace";
 import { PreviewPanel } from "@/components/PreviewPanel";
+import { Email2ActionPanel } from "@/components/Email2ActionPanel";
 import { ConfirmSendModal } from "@/components/ui/ConfirmSendModal";
 import { BottomNavigation } from "@/components/BottomNavigation";
 
@@ -19,8 +20,6 @@ export default function App() {
   const { isUploading, sfmcSuccess, sendToSfmc } = useSfmcDraftSender();
   
   const [confirmOpen, setConfirmOpen] = useState(false);
-  
-  // 🆕 ESTADO DE VISTA ACTIVA (para móviles)
   const [activeView, setActiveView] = useState<AppView>("config");
 
   const handleUploadClick = () => {
@@ -56,9 +55,8 @@ export default function App() {
   return (
     <div className="h-screen w-full bg-slate-50 overflow-hidden flex flex-col font-sans text-slate-900">
       
-      {/* 📱 LAYOUT MÓVIL (<1024px) - Una sola vista a la vez */}
+      {/* 📱 LAYOUT MÓVIL (<1024px) */}
       <main className="flex-1 min-h-0 flex flex-col lg:hidden">
-        {/* Vista Configuración */}
         {activeView === "config" && (
           <div className="flex-1 overflow-y-auto bg-white custom-scrollbar">
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border-b border-slate-100 px-4 py-3 shadow-sm">
@@ -75,7 +73,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Vista Edición */}
         {activeView === "edit" && (
           <div className="flex-1 overflow-y-auto bg-slate-50/50 custom-scrollbar pb-20">
             <Email2Workspace
@@ -90,7 +87,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Vista Preview */}
         {activeView === "preview" && (
           <div className="flex-1 overflow-y-auto bg-white custom-scrollbar pb-20">
             <PreviewPanel
@@ -107,11 +103,10 @@ export default function App() {
           </div>
         )}
 
-        {/* Bottom Navigation (Móvil) */}
         <BottomNavigation activeView={activeView} onViewChange={setActiveView} />
       </main>
 
-      {/* 🖥️ LAYOUT DESKTOP (≥1024px) - Tres columnas */}
+      {/* 🖥️ LAYOUT DESKTOP (≥1024px) */}
       <main className="hidden lg:grid flex-1 min-h-0 grid-cols-[420px_minmax(0,1fr)] xl:grid-cols-[420px_minmax(0,1fr)_540px] divide-x divide-slate-200">
         
         {/* Columna 1: Sidebar */}
@@ -129,25 +124,60 @@ export default function App() {
           </div>
         </aside>
 
-        {/* Columna 2: Workspace */}
-        <section className="h-full min-h-0 overflow-y-auto bg-slate-50/50 relative custom-scrollbar">
-          <div className="max-w-[1600px] mx-auto min-h-full flex flex-col">
-            <Email2Workspace
+        {/* Columna 2: Workspace + Footer Sticky (Tablets) */}
+        <section className="h-full min-h-0 flex flex-col relative">
+          {/* Editor */}
+          <div className="flex-1 overflow-y-auto bg-slate-50/50 custom-scrollbar">
+            <div className="max-w-[1600px] mx-auto min-h-full flex flex-col">
+              <Email2Workspace
+                batchId={batchState.batchId}
+                trios={batchState.contentSets}
+                images={batchState.images}
+                showInternalPreview={false}
+                onPreviewChange={batchState.setLivePreview}
+                onEditedChange={batchState.handleEditedChange}
+                onImagesChange={batchState.setImages}
+              />
+              <div className="h-32 shrink-0" />
+            </div>
+          </div>
+
+          {/* 🆕 FOOTER STICKY - Solo tablets (1024-1280px) */}
+          <div className="lg:block xl:hidden sticky bottom-0 left-0 right-0 z-30 border-t bg-white shadow-[0_-4px_12px_rgba(0,0,0,0.1)]">
+            <Email2ActionPanel
+              mode="compact"
+              livePreview={batchState.livePreview}
               batchId={batchState.batchId}
-              trios={batchState.contentSets}
-              images={batchState.images}
-              showInternalPreview={false}
-              onPreviewChange={batchState.setLivePreview}
-              onEditedChange={batchState.handleEditedChange}
-              onImagesChange={batchState.setImages}
+              isSaving={batchState.isSaving}
+              isUploading={isUploading}
+              lastSavedAt={batchState.lastSavedAt}
+              savedVisible={batchState.savedVisible}
+              sfmcSuccess={sfmcSuccess}
+              onSave={batchState.saveEdits}
+              onUploadClick={handleUploadClick}
             />
-            <div className="h-32 shrink-0" />
           </div>
         </section>
 
-        {/* Columna 3: Preview Panel (solo en XL) */}
-        <div className="h-full min-h-0 overflow-y-auto bg-white custom-scrollbar">
-          <PreviewPanel
+        {/* Columna 3: Preview Panel + Action Panel (XL) */}
+        <div className="h-full min-h-0 flex flex-col overflow-hidden bg-white">
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
+            <PreviewPanel
+              livePreview={batchState.livePreview}
+              batchId={batchState.batchId}
+              isSaving={batchState.isSaving}
+              isUploading={isUploading}
+              lastSavedAt={batchState.lastSavedAt}
+              savedVisible={batchState.savedVisible}
+              sfmcSuccess={sfmcSuccess}
+              onSave={batchState.saveEdits}
+              onUploadClick={handleUploadClick}
+            />
+          </div>
+          
+          {/* Action Panel vertical (Desktop XL) */}
+          <Email2ActionPanel
+            mode="full"
             livePreview={batchState.livePreview}
             batchId={batchState.batchId}
             isSaving={batchState.isSaving}
