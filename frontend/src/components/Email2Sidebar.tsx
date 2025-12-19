@@ -19,9 +19,6 @@ import { useSidebarForm } from "@/hooks/useSidebarForm";
 import { ConfirmGenerateModal } from "@/components/ui/ConfirmGenerateModal";
 import { Loader2, HelpCircle, Minus, Plus, Info } from "lucide-react";
 
-/* =========================
- * UI Helpers
- * ========================= */
 const inputClass =
   "w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all disabled:opacity-50 disabled:bg-slate-50";
 const textareaClass =
@@ -165,9 +162,6 @@ const StepperInput = ({
   );
 };
 
-/* =========================
- * Componente Principal
- * ========================= */
 export function Email2Sidebar({
   onGenerated,
   currentBatchId,
@@ -191,18 +185,14 @@ export function Email2Sidebar({
   const elapsedLabel = useMemo(() => formatDuration(elapsed), [elapsed]);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
-  
-  // -- ESTADO E HISTORIAL --
   const [history, setHistory] = useState<HistoryBatch[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
-  
   const [query, setQuery] = useState("");
   const [activeBatchId, setActiveBatchId] = useState<string | undefined>(
     currentBatchId
   );
   const pendingTimers = useRef<number[]>([]);
 
-  // Limpiar cluster al cambiar campaña
   const prevCampaign = useRef(state.campaign);
   useEffect(() => {
     if (prevCampaign.current !== state.campaign) {
@@ -211,32 +201,24 @@ export function Email2Sidebar({
     }
   }, [state.campaign, setState]);
 
-  // Cleanup timers
   useEffect(() => {
     return () => {
       pendingTimers.current.forEach((id) => clearTimeout(id));
     };
   }, []);
 
-  // Sync batch activo desde props
   useEffect(() => {
     if (currentBatchId) setActiveBatchId(currentBatchId);
   }, [currentBatchId]);
 
-  // Cronómetro
   useEffect(() => {
     if (!isGenerating || !startedAt) return;
     const t = window.setInterval(() => setElapsed(Date.now() - startedAt), 250);
     return () => clearInterval(t);
   }, [isGenerating, startedAt]);
 
-  // Cargar Historial (Optimizado con Loader)
   const refreshHistory = useCallback(async (silent = true) => {
-    // Si la lista está vacía, mostramos loading. Si ya tiene datos, silent update.
-    if (history.length === 0 && !silent) setIsHistoryLoading(true);
-    // Si se pide explícito (!silent), forzamos loading indicator
     if (!silent) setIsHistoryLoading(true);
-
     try {
       const data = await listHistory("emails_v2");
       setHistory(data);
@@ -245,36 +227,28 @@ export function Email2Sidebar({
     } finally {
       setIsHistoryLoading(false);
     }
-  }, [history.length]);
+  }, []);
 
-  // Efecto de carga inicial
   useEffect(() => {
-    // Primera carga: visible si está vacío, silenciosa si no
-    refreshHistory(false); 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); 
+    refreshHistory(false);
+  }, [refreshHistory]);
 
   const catchUpHistoryFor = useCallback((targetBatchId: string) => {
     const delays = [700, 1500, 3500];
     const run = async () => {
       try {
-        // Ejecutamos en segundo plano sin activar el loader UI para no molestar
         const data = await listHistory("emails_v2");
         setHistory(data);
         if (data.some((h) => h.batchId === targetBatchId)) {
           pendingTimers.current.forEach((id) => clearTimeout(id));
         }
-      } catch {
-        /* ignore */
-      }
+      } catch { /* ignore */ }
     };
     delays.forEach((ms) => {
       const id = window.setTimeout(run, ms);
       pendingTimers.current.push(id);
     });
   }, []);
-
-  // --- ACCIONES ---
 
   function handlePreGenerate() {
     if (!meta) return toast.error("Catálogo no cargado.");
@@ -296,15 +270,13 @@ export function Email2Sidebar({
         cluster: state.cluster,
         sets: state.setCount,
         images: state.imageCount,
-        // --- CAMBIOS CLAVE AQUI ---
-        temperature: state.temperature, 
+        temperature: state.temperature,
         imageQuality: state.imageQuality,
-        // --------------------------
         feedback: {
-          subject: state.feedbackSubject || undefined,
-          preheader: state.feedbackPreheader || undefined,
-          body: state.feedbackBody || undefined,
-        } as any,
+          subject: state.feedbackSubject || "",
+          preheader: state.feedbackPreheader || "",
+          body: state.feedbackBody || "",
+        },
       };
 
       const resp = await generateEmailsV2(payload);
@@ -323,7 +295,7 @@ export function Email2Sidebar({
       toast.error(e?.message || "Error al generar.");
     } finally {
       setIsGenerating(false);
-      setElapsed((prev) => (prev === 0 ? Date.now() - startTime : prev));
+      setElapsed(Date.now() - startTime);
     }
   }
 
@@ -332,23 +304,15 @@ export function Email2Sidebar({
     const bid = extractBatchId(inputVal) || inputVal.trim();
     if (!bid) return toast.error("ID no válido.");
     
-    // Al cargar manual, activamos loader de historial para dar feedback visual
-    // Pero como ahora tenemos caché, esto será instantáneo en la 2da vez
-    setIsHistoryLoading(true); 
+    setIsHistoryLoading(true);
     const toastId = toast.loading("Cargando lote...");
     
     try {
       const resp = await loadHistoryBatch(bid);
       setActiveBatchId(resp.batchId);
       onGenerated?.(resp);
-      
-      // Si fue muy rápido (caché), el toast loading casi no se ve.
       toast.success(`Lote ${resp.batchId} cargado`, { id: toastId });
-      
-      // Refrescamos la lista para asegurarnos que el lote aparezca
-      // (sin bloquear UI)
-      listHistory("emails_v2").then(setHistory).catch(() => {});
-
+      refreshHistory(true);
     } catch (e: any) {
       toast.error(`Error: ${e.message}`, { id: toastId });
     } finally {
@@ -358,15 +322,12 @@ export function Email2Sidebar({
 
   const filteredHistory = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return !q
-      ? history
-      : history.filter((h) => h.batchId.toLowerCase().includes(q));
+    return !q ? history : history.filter((h) => h.batchId.toLowerCase().includes(q));
   }, [history, query]);
 
   const batchJsonLink = activeBatchId ? gcsBatchJsonUrl(activeBatchId) : null;
   const isFormValid = Boolean(state.campaign && state.cluster);
 
-  // Encontrar descripción seleccionada para mostrar en UI
   const selectedCampaignDesc = useMemo(
     () => availableCampaigns.find((c) => c.id === state.campaign)?.description,
     [state.campaign, availableCampaigns]
@@ -377,18 +338,16 @@ export function Email2Sidebar({
     [state.cluster, availableClusters]
   );
 
-  const isCampaignsListEmpty = availableCampaigns.length === 0 && !metaLoading;
   const campaignPlaceholder = metaLoading 
     ? "Cargando catálogo..." 
     : metaError
       ? "Error cargando catálogo"
-      : isCampaignsListEmpty 
+      : availableCampaigns.length === 0 
         ? "No hay campañas disponibles" 
         : "-- Selecciona --";
 
   return (
-    <div className="font-sans space-y-6 pb-10">
-      {/* Header */}
+    <div className="font-sans space-y-6 pb-24 lg:pb-10">
       <div className="space-y-3 pb-1">
         <div className="flex items-center justify-between px-1">
           <h3 className="text-lg font-bold text-slate-800 tracking-tight">
@@ -410,10 +369,7 @@ export function Email2Sidebar({
 
         {activeBatchId && (
           <div className="mx-1 px-3 py-2 bg-slate-100 rounded-lg text-xs text-slate-600 flex justify-between items-center group hover:bg-slate-200 transition-colors">
-            <span
-              className="font-mono truncate max-w-[180px]"
-              title={activeBatchId}
-            >
+            <span className="font-mono truncate max-w-[180px]" title={activeBatchId}>
               {activeBatchId}
             </span>
             {batchJsonLink && (
@@ -430,65 +386,46 @@ export function Email2Sidebar({
         )}
       </div>
 
-      {/* 1. Selección Base */}
       <Collapsible title="📘 Selección de Campaña">
         {metaError && (
           <div className="p-2 bg-rose-50 text-rose-600 text-xs rounded-md">
             {metaError}
           </div>
         )}
-
         <div className="space-y-5">
-          {/* CAMPAÑA */}
           <div>
             <label className="mb-1 block text-xs font-bold text-slate-700 uppercase flex items-center">
               Campaña <span className="text-red-500 ml-1">*</span>
             </label>
             <select
               className={inputClass}
-              disabled={isGenerating || metaLoading || isCampaignsListEmpty}
+              disabled={isGenerating || metaLoading || availableCampaigns.length === 0}
               value={state.campaign}
-              onChange={(e) =>
-                setState((s) => ({ ...s, campaign: e.target.value }))
-              }
+              onChange={(e) => setState((s) => ({ ...s, campaign: e.target.value }))}
             >
-              <option value="" disabled>
-                {campaignPlaceholder}
-              </option>
+              <option value="" disabled>{campaignPlaceholder}</option>
               {availableCampaigns.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
+                <option key={c.id} value={c.id}>{c.label}</option>
               ))}
             </select>
-            {/* Descripción dinámica */}
             {selectedCampaignDesc && (
               <div className="mt-1.5 flex items-start gap-1.5 px-1">
                 <Info className="w-3 h-3 text-sky-500 mt-0.5 shrink-0" />
-                <p className="text-[10px] text-slate-500 leading-snug">
-                  {selectedCampaignDesc}
-                </p>
+                <p className="text-[10px] text-slate-500 leading-snug">{selectedCampaignDesc}</p>
               </div>
             )}
           </div>
 
-          {/* CLUSTER */}
           <div>
             <label className="mb-1 block text-xs font-bold text-slate-700 uppercase flex items-center">
               Segmento (Cluster) <span className="text-red-500 ml-1">*</span>
             </label>
-            <div
-              className={
-                !state.campaign ? "opacity-60 cursor-not-allowed" : ""
-              }
-            >
+            <div className={!state.campaign ? "opacity-60 cursor-not-allowed" : ""}>
               <select
                 className={inputClass}
                 disabled={isGenerating || !state.campaign || availableClusters.length === 0}
                 value={state.cluster}
-                onChange={(e) =>
-                  setState((s) => ({ ...s, cluster: e.target.value }))
-                }
+                onChange={(e) => setState((s) => ({ ...s, cluster: e.target.value }))}
               >
                 <option value="" disabled>
                   {state.campaign
@@ -496,17 +433,13 @@ export function Email2Sidebar({
                     : "Primero selecciona campaña"}
                 </option>
                 {availableClusters.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                  </option>
+                  <option key={c.id} value={c.id}>{c.label}</option>
                 ))}
               </select>
               {selectedClusterDesc && (
                 <div className="mt-1.5 flex items-start gap-1.5 px-1 animate-in fade-in duration-300">
                   <Info className="w-3 h-3 text-sky-500 mt-0.5 shrink-0" />
-                  <p className="text-[10px] text-slate-500 leading-snug">
-                    {selectedClusterDesc}
-                  </p>
+                  <p className="text-[10px] text-slate-500 leading-snug">{selectedClusterDesc}</p>
                 </div>
               )}
             </div>
@@ -514,75 +447,51 @@ export function Email2Sidebar({
         </div>
       </Collapsible>
 
-      {/* 2. Instrucciones IA (Mantenido) */}
-      <Collapsible
-        title="🧠 Instrucciones IA (Opcional)"
-        subtitle="Dale pistas a la IA para afinar el tono o contenido."
-      >
+      <Collapsible title="🧠 Instrucciones IA (Opcional)" subtitle="Dale pistas a la IA.">
         <div className="space-y-4">
           <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="flex items-center text-xs font-bold text-slate-700">
-                Instrucciones Asunto
-              </label>
-            </div>
+            <label className="mb-1 block text-xs font-bold text-slate-700">Instrucciones Asunto</label>
             <textarea
               className={textareaClass}
               rows={2}
               placeholder="Ej: Destaca urgencia: '¡Solo por 72 horas!'."
               onInput={autoGrow}
               value={state.feedbackSubject}
-              onChange={(e) =>
-                setState((s) => ({ ...s, feedbackSubject: e.target.value }))
-              }
+              onChange={(e) => setState((s) => ({ ...s, feedbackSubject: e.target.value }))}
             />
           </div>
           <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="flex items-center text-xs font-bold text-slate-700">
-                Instrucciones Pre-header
-              </label>
-            </div>
+            <label className="mb-1 block text-xs font-bold text-slate-700">Instrucciones Pre-header</label>
             <textarea
               className={textareaClass}
               rows={2}
               placeholder="Ej: Fecha límite: 30 de noviembre."
               onInput={autoGrow}
               value={state.feedbackPreheader}
-              onChange={(e) =>
-                setState((s) => ({ ...s, feedbackPreheader: e.target.value }))
-              }
+              onChange={(e) => setState((s) => ({ ...s, feedbackPreheader: e.target.value }))}
             />
           </div>
           <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="flex items-center text-xs font-bold text-slate-700">
-                Instrucciones Cuerpo
-                <InfoTooltip text="Guía la estructura, tono y elementos clave del correo a generar." />
-              </label>
-            </div>
+            <label className="mb-1 block text-xs font-bold text-slate-700">
+              Instrucciones Cuerpo <InfoTooltip text="Guía el tono y elementos clave." />
+            </label>
             <textarea
               className={textareaClass}
               rows={2}
-              placeholder="Ej: Pareja joven y feliz comprando en un mall, usando su tarjeta."
+              placeholder="Ej: Pareja joven comprando en un mall."
               onInput={autoGrow}
               value={state.feedbackBody}
-              onChange={(e) =>
-                setState((s) => ({ ...s, feedbackBody: e.target.value }))
-              }
+              onChange={(e) => setState((s) => ({ ...s, feedbackBody: e.target.value }))}
             />
           </div>
         </div>
       </Collapsible>
 
-      {/* 3. Configuración */}
       <Collapsible title="⚙️ Configuración">
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div className="flex flex-col">
             <div className="flex items-center gap-1 mb-2 min-h-[2rem]">
-              <label className="block text-xs font-bold text-slate-700 leading-tight">
-                Opciones Texto
-              </label>
+              <label className="text-xs font-bold text-slate-700 leading-tight">Opciones Texto</label>
               <InfoTooltip text="Variantes de texto a generar." />
             </div>
             <StepperInput
@@ -592,10 +501,8 @@ export function Email2Sidebar({
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-1 mb-2 min-h-[2rem]">
-              <label className="block text-xs font-bold text-slate-700 leading-tight">
-                Imágenes
-              </label>
-              <InfoTooltip text="Cantidad de imágenes a generar." />
+              <label className="text-xs font-bold text-slate-700 leading-tight">Imágenes</label>
+              <InfoTooltip text="Cantidad de imágenes." />
             </div>
             <StepperInput
               value={state.imageCount}
@@ -604,71 +511,42 @@ export function Email2Sidebar({
           </div>
         </div>
 
-        {/* --- CONTROL DE CALIDAD IMAGEN --- */}
         <div className="pt-3 border-t border-slate-100 mb-3">
-            <div className="flex items-center gap-1 mb-2">
-              <label className="text-xs font-bold text-slate-700">Calidad Imagen</label>
-              <InfoTooltip text="Mayor calidad implica mayor costo y tiempo de generación." />
-            </div>
-            
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { val: "low", label: "Baja", cost: "$" },
-                { val: "medium", label: "Media", cost: "$$" },
-                { val: "high", label: "Alta", cost: "$$$" },
-              ].map((opt) => (
-                <button
-                  key={opt.val}
-                  type="button"
-                  onClick={() => setState(s => ({ ...s, imageQuality: opt.val as any }))}
-                  className={`
-                    flex flex-col items-center justify-center py-2 rounded-lg border text-xs transition-all
-                    ${state.imageQuality === opt.val 
-                        ? "bg-sky-50 border-sky-500 text-sky-700 ring-1 ring-sky-500 shadow-sm" 
-                        : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"}
-                  `}
-                >
-                  <span className="font-semibold">{opt.label}</span>
-                  <span className="text-[10px] opacity-70 mt-0.5 font-mono font-bold text-slate-400">{opt.cost}</span>
-                </button>
-              ))}
-            </div>
+          <label className="text-xs font-bold text-slate-700 mb-2 block">Calidad Imagen</label>
+          <div className="grid grid-cols-3 gap-2">
+            {(["low", "medium", "high"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setState(s => ({ ...s, imageQuality: v }))}
+                className={`flex flex-col items-center py-2 rounded-lg border text-xs transition-all ${
+                  state.imageQuality === v ? "bg-sky-50 border-sky-500 text-sky-700 shadow-sm" : "bg-white border-slate-200 text-slate-600"
+                }`}
+              >
+                <span className="font-semibold">{v === 'low' ? 'Baja' : v === 'medium' ? 'Media' : 'Alta'}</span>
+                <span className="text-[10px] opacity-70 font-mono">{v === 'low' ? '$' : v === 'medium' ? '$$' : '$$$'}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* --- CONTROL DE TEMPERATURA --- */}
         <div className="pt-3 border-t border-slate-100">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-1">
-              <label className="text-xs font-bold text-slate-700">Creatividad IA</label>
-              <InfoTooltip text="Define qué tan predecible (Bajo) o creativo (Alto) será el texto." />
-            </div>
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-xs font-bold text-slate-700">Creatividad IA</label>
             <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
               {state.temperature.toFixed(1)}
             </span>
           </div>
-          
           <input
             type="range"
-            min="0"
-            max="1.2"
-            step="0.1"
+            min="0" max="1.2" step="0.1"
             value={state.temperature}
-            onChange={(e) => {
-              const val = parseFloat(e.target.value);
-              setState(s => ({ ...s, temperature: val }));
-            }}
-            className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+            onChange={(e) => setState(s => ({ ...s, temperature: parseFloat(e.target.value) }))}
+            className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-600"
           />
-          
-          <div className="flex justify-between text-[9px] text-slate-400 mt-1 font-medium uppercase tracking-wide">
-            <span>Preciso</span>
-            <span>Balanceado</span>
-            <span>Creativo</span>
-          </div>
         </div>
       </Collapsible>
 
-      {/* 4. Historial (Optimizado y Corregido) */}
       <Collapsible title="🕓 Historial" defaultOpen={false}>
         <div className="space-y-2">
           <div className="flex gap-2">
@@ -678,27 +556,20 @@ export function Email2Sidebar({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleLoadBatch(query)}
-              disabled={isHistoryLoading} 
             />
             <button
               onClick={() => handleLoadBatch(query)}
-              disabled={!query || isHistoryLoading} 
-              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold text-slate-600 transition-colors"
+              disabled={!query || isHistoryLoading}
+              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold text-slate-600"
             >
               CARGAR
             </button>
           </div>
-
           <div className="max-h-[200px] overflow-y-auto rounded-lg border border-slate-100">
             {isHistoryLoading ? (
-              <div className="p-4 text-xs text-slate-400 text-center flex items-center justify-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Cargando historial...
-              </div>
+              <div className="p-4 text-xs text-center flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /></div>
             ) : filteredHistory.length === 0 ? (
-              <div className="p-4 text-xs text-slate-400 text-center italic">
-                Sin resultados
-              </div>
+              <div className="p-4 text-xs text-slate-400 text-center italic">Sin resultados</div>
             ) : (
               <ul className="divide-y divide-slate-50">
                 {filteredHistory.map((h) => (
@@ -708,26 +579,9 @@ export function Email2Sidebar({
                     onClick={() => handleLoadBatch(h.batchId)}
                   >
                     <div>
-                      <div className="font-mono text-[10px] text-slate-600 font-medium group-hover:text-sky-600 transition-colors">
-                        {h.batchId}
-                      </div>
-                      <div className="text-[9px] text-slate-400">
-                        {h.count ?? "-"} items
-                      </div>
+                      <div className="font-mono text-[10px] text-slate-600 group-hover:text-sky-600">{h.batchId}</div>
+                      <div className="text-[9px] text-slate-400">{h.count ?? "-"} items</div>
                     </div>
-                    <svg
-                      className="w-4 h-4 text-slate-300 group-hover:text-sky-500"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
                   </li>
                 ))}
               </ul>
@@ -736,42 +590,16 @@ export function Email2Sidebar({
         </div>
       </Collapsible>
 
-      {/* Footer (Arreglado) */}
-      <div className="mt-4 border-t pt-4 bg-white/95">
+      <div className="sticky bottom-16 left-0 right-0 lg:static mt-4 border-t pt-4 bg-white lg:bg-transparent shadow-[0_-8px_20px_rgba(0,0,0,0.12)] lg:shadow-none -mx-4 px-4 lg:mx-0 lg:px-0 pb-4 lg:pb-0 z-30">
         <button
           onClick={handlePreGenerate}
           disabled={isGenerating || metaLoading || !isFormValid}
-          className={`
-            w-full rounded-2xl px-6 py-3.5 text-sm md:text-base font-semibold text-white shadow-sm transition flex items-center justify-center gap-2
-            ${
-              isGenerating || metaLoading
-                ? "bg-sky-400 cursor-wait"
-                : !isFormValid
-                ? "bg-slate-300 cursor-not-allowed opacity-70"
-                : "bg-sky-600 hover:bg-sky-700 active:scale-[0.99]"
-            }
-          `}
-          title={!isFormValid ? "Selecciona Campaña y Cluster para generar" : ""}
+          className={`w-full rounded-2xl px-6 py-3.5 text-sm md:text-base font-semibold text-white transition flex items-center justify-center gap-2 ${
+            isGenerating || metaLoading ? "bg-sky-400 cursor-wait" : !isFormValid ? "bg-slate-300 opacity-70" : "bg-sky-600 hover:bg-sky-700"
+          }`}
         >
-          {isGenerating ? (
-            <>
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span>Generando...</span>
-            </>
-          ) : metaLoading ? (
-            "Cargando catálogo..."
-          ) : (
-            "Generar"
-          )}
+          {isGenerating ? <><Loader2 className="h-5 w-5 animate-spin" /> Generando...</> : metaLoading ? "Cargando..." : "Generar"}
         </button>
-
-        {isGenerating && (
-          <div className="mt-3 w-full">
-            <div className="mt-2 h-1.5 overflow-hidden rounded bg-neutral-200">
-              <div className="h-full w-1/3 animate-[loading_1.4s_ease-in-out_infinite] rounded bg-sky-500" />
-            </div>
-          </div>
-        )}
       </div>
 
       <ConfirmGenerateModal
@@ -786,14 +614,7 @@ export function Email2Sidebar({
           images: state.imageCount,
         }}
       />
-
-      <style>{`
-        @keyframes loading {
-          0% { transform: translateX(-120%); }
-          50% { transform: translateX(40%); }
-          100% { transform: translateX(120%); }
-        }
-      `}</style>
+      <style>{`@keyframes loading { 0% { transform: translateX(-120%); } 50% { transform: translateX(40%); } 100% { transform: translateX(120%); } }`}</style>
     </div>
   );
 }

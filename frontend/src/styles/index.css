@@ -163,6 +163,93 @@ details.accordion .accordion-body {
   }
 }
 
-/* Por si quieres un fade más suave/local en algún contenedor específico */
-/* .edge-fade-x--sm { --edge: 18px; } */
-/* .edge-fade-x--lg { --edge: 40px; } */
+/* ============== Scrollbar personalizado ============== */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ============== Safe Area para dispositivos móviles ============== */
+/* Maneja el espacio de gestos en iPhone/Android (notch, home indicator) */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0);
+}
+
+.safe-area-left {
+  padding-left: env(safe-area-inset-left, 0);
+}
+
+.safe-area-right {
+  padding-right: env(safe-area-inset-right, 0);
+}
+
+/* ============== Animaciones de entrada suaves ============== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromBottom {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slide-in-bottom {
+  animation: slideInFromBottom 0.4s ease-out;
+}
+
+/* ============== Mejoras para táctil (móvil) ============== */
+/* Aumenta el área táctil de botones pequeños */
+@media (pointer: coarse) {
+  button,
+  a {
+    min-height: 44px; /* Tamaño mínimo recomendado para táctil */
+  }
+}
+
+/* Previene el zoom en inputs en iOS Safari */
+@supports (-webkit-touch-callout: none) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
